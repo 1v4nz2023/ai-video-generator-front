@@ -2,74 +2,58 @@ function buildEditForm(data) {
     const {
         formato, es_video, etiqueta_contenido, emoji_contenido,
         produccion_id, noticia_id,
-        noticia,
-        total_dialogos,
-        escenas
+        form_fields
     } = data;
 
-    const { titulo, descripcion, editor_responsable, main_scene, url, autor } = noticia;
+    let formHTML = '';
 
-    let scenesHTML = '';
+    form_fields.forEach((field, index) => {
+        let fieldHTML = '';
+        const label = field.fieldLabel ? `<label>${field.fieldLabel}</label><br>` : '';
 
-    for (const escena of escenas) {
-        const numero = escena.numero;
-        const tituloEscena = escena.titulo ?? `Escena ${numero}`;
-        const nombreSpeaker = escena.nombre_speaker ?? escena.speaker ?? "Sin personaje";
-        const icono = escena.icono ?? "💬";
-        const dialogo = escena.dialogo ?? "";
-        const ediciones = escena.ediciones ?? 0;
-        const maxEdiciones = escena.max_ediciones ?? 3;
-        const puedeEditar = escena.puede_editar ?? true;
-        const incluido = escena.incluido ?? true;
-        const previewSrc = escena.preview_url?.trim() || "";
+        switch (field.fieldType) {
+            case 'html':
+                fieldHTML = `<div class="form-section">${field.html}</div>`;
+                break;
+            case 'text':
+                fieldHTML = `
+                    <div class="form-group">
+                        ${label}
+                        <input type="text" id="${field.fieldName}" value="${field.defaultValue ?? ''}" placeholder="${field.placeholder ?? ''}">
+                    </div>`;
+                break;
+            case 'textarea':
+                fieldHTML = `
+                    <div class="form-group">
+                        ${label}
+                        <textarea id="${field.fieldName}" placeholder="${field.placeholder ?? ''}" rows="3">${field.defaultValue ?? ''}</textarea>
+                        <div class="word-counter" data-numero="${field.fieldName.split('_').pop()}">${field.defaultValue ? (field.defaultValue.split(/\s+/).filter(Boolean).length) : 0} / 16 palabras</div>
+                    </div>`;
+                break;
+            case 'dropdown':
+                fieldHTML = `
+                    <div class="form-group">
+                        ${label}
+                        <select id="${field.fieldName}">
+                            ${field.fieldOptions.values.map(opt => `<option value="${opt.option}" ${opt.option === field.defaultValue ? 'selected' : ''}>${opt.option}</option>`).join('')}
+                        </select>
+                    </div>`;
+                break;
+            case 'checkbox':
+                const checked = (field.defaultValue && field.defaultValue.includes(field.fieldOptions.values[0].option)) ? 'checked' : '';
+                fieldHTML = `
+                    <div class="form-group">
+                        ${label}
+                        <input type="checkbox" class="scene-checkbox" data-numero="${field.fieldName.split('_').pop()}" ${checked}>
+                    </div>`;
+                break;
+            case 'hiddenField':
+                fieldHTML = `<input type="hidden" id="${field.fieldName}" value="${field.fieldValue ?? ''}">`;
+                break;
+        }
 
-        scenesHTML += `
-            <div class="scene-card" data-ediciones="${ediciones}" data-max-ediciones="${maxEdiciones}">
-                <div class="scene-header">
-                    <h3>${emoji_contenido} ${etiqueta_contenido} ${numero}</h3>
-                    <p><strong>${escaparHTML(tituloEscena)}</strong></p>
-                </div>
-
-                <div class="scene-field">
-                    <label>Incluir en el video</label>
-                    <input type="checkbox" class="scene-checkbox" data-numero="${numero}" ${incluido ? 'checked' : ''}>
-                </div>
-
-                <div class="scene-field">
-                    <p>
-                        <strong>Ediciones:</strong>
-                        <span class="ediciones-count" data-numero="${numero}">${ediciones}</span> / ${maxEdiciones}
-                        <span class="limite-alcanzado" data-numero="${numero}" style="color:#b91c1c;${!puedeEditar ? '' : 'display:none;'}">⚠ Límite alcanzado</span>
-                    </p>
-                </div>
-
-                <div class="scene-field">
-                    <label>${icono} ${escaparHTML(nombreSpeaker)} (mínimo 5 y máximo 16 palabras)</label>
-                    ${puedeEditar
-                        ? `<textarea class="scene-dialogue" data-numero="${numero}" data-original="${escaparHTML(dialogo)}" placeholder="Diálogo de la escena..." rows="3">${escaparHTML(dialogo)}</textarea>
-                        <div class="word-counter" data-numero="${numero}">${escaparHTML(dialogo) ? escaparHTML(String(dialogo).split(/\s+/).filter(Boolean).length) : 0} / 16 palabras</div>`
-                        : `<p class="locked-dialogue">${escaparHTML(dialogo)}</p>`
-                    }
-                </div>
-
-                ${previewSrc
-                    ? `<div class="scene-preview-actions">
-                        <button class="btn-preview" onclick="openPreviewModal('${escaparHTML(previewSrc).replace(/'/g, "\\'")}')">
-                            ▶ Ver preview
-                        </button>
-                        <button class="btn-refresh-preview" onclick="refreshPreview(this)">
-                            ↻ Actualizar preview
-                        </button>
-                      </div>`
-                    : `<div class="scene-preview-actions">
-                        <button class="btn-refresh-preview" onclick="refreshPreview(this)">
-                            ↻ Actualizar preview
-                        </button>
-                      </div>`
-                }
-            </div>
-        `;
-    }
+        formHTML += `<div class="form-field-container" style="margin-bottom: 20px;">${fieldHTML}</div>`;
+    });
 
     return `
         <div class="edit-modal-overlay">
@@ -78,71 +62,9 @@ function buildEditForm(data) {
                     <h2>✏️ Editar ${es_video ? 'Escenas' : 'Viñetas'}</h2>
                     <button id="btnCloseEditModal" type="button">&times;</button>
                 </div>
-
                 <div class="edit-modal-body">
-                    <div class="news-info">
-                        <h3>📰 Información de la noticia</h3>
-                        <div class="news-title">${escaparHTML(titulo)}</div>
-                        <div class="news-desc">${escaparHTML(descripcion)}</div>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <label>Autor</label>
-                                <span>${escaparHTML(autor)}</span>
-                            </div>
-                            <div class="info-item">
-                                <label>ID Noticia</label>
-                                <span>${escaparHTML(noticia_id)}</span>
-                            </div>
-                            <div class="info-item">
-                                <label>URL</label>
-                                <a href="${escaparHTML(url)}" target="_blank">Abrir noticia original</a>
-                            </div>
-                            <div class="info-item">
-                                <label>Total de ${etiqueta_contenido}s</label>
-                                <span>${total_dialogos}</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Formato</label>
-                                <span>${formato?.toUpperCase() || 'VIDEO'}</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Producción ID</label>
-                                <span>${escaparHTML(produccion_id)}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="video-fields">
-                        <h3>📝 Datos del video</h3>
-                        <div class="form-row">
-                            <div class="form-group-inline">
-                                <label for="titulo_video">Título del video</label>
-                                <input type="text" id="titulo_video" value="${escaparHTML(titulo)}" placeholder="Título del video">
-                            </div>
-                            <div class="form-group-inline">
-                                <label for="descripcion_video">Descripción</label>
-                                <input type="text" id="descripcion_video" value="${escaparHTML(descripcion)}" placeholder="Descripción del video">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group-inline">
-                                <label for="editor_responsable">Editor responsable</label>
-                                <input type="text" id="editor_responsable" value="${escaparHTML(editor_responsable)}" placeholder="correo@ejemplo.com">
-                            </div>
-                            <div class="form-group-inline">
-                                <label for="main_scene">Escenario (en inglés)</label>
-                                <input type="text" id="main_scene" value="${escaparHTML(main_scene)}" placeholder="Main scene description">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="scenes-list">
-                        <h3>✏️ Editar ${es_video ? 'escenas' : 'viñetas'}</h3>
-                        <p style="color:#555;margin-bottom:16px;">Puedes modificar los diálogos antes de continuar con la producción del ${es_video ? 'video' : 'la historieta'}.</p>
-                        ${scenesHTML}
-                    </div>
+                    ${formHTML}
                 </div>
-
                 <div class="edit-modal-footer">
                     <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
                     <button class="btn-save" id="btnSave">Guardar cambios</button>
@@ -155,36 +77,35 @@ function buildEditForm(data) {
 function openEditModal(data) {
     const existing = document.querySelector('.edit-modal-overlay');
     if (existing) existing.remove();
-
+    
     try {
         localStorage.setItem('editModalData', JSON.stringify(data));
     } catch (e) {
         console.warn('No se pudo guardar en localStorage:', e);
     }
-
+    
     const html = buildEditForm(data);
     document.body.insertAdjacentHTML('beforeend', html);
-
+    
     const overlay = document.querySelector('.edit-modal-overlay');
     const closeBtn = document.getElementById('btnCloseEditModal');
     const saveBtn = document.getElementById('btnSave');
-
+    
     if (!closeBtn || !saveBtn) {
         console.error('Error: No se encontraron los botones del modal');
         closeEditModal();
         showMessage('Error al abrir el modal. Por favor, intenta de nuevo.', 'error');
         return;
     }
-
+    
     closeBtn.addEventListener('click', function () {
-        console.log('Close button clicked');
         if (hasUnsavedChanges) {
             showAbandonModalDesdeX();
         } else {
             closeEditModal();
         }
     });
-
+    
     overlay.addEventListener('click', function (e) {
         if (e.target === overlay) {
             if (hasUnsavedChanges) {
@@ -194,10 +115,22 @@ function openEditModal(data) {
             }
         }
     });
-
+    
     saveBtn.addEventListener('click', saveChanges);
+    
+    document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
+        el.addEventListener('input', function () {
+            hasUnsavedChanges = true;
+        });
+    });
 
-    document.querySelectorAll('.scene-dialogue').forEach(textarea => {
+    document.querySelectorAll('.scene-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function () {
+            hasUnsavedChanges = true;
+        });
+    });
+
+    document.querySelectorAll('textarea').forEach(textarea => {
         textarea.addEventListener('input', function () {
             hasUnsavedChanges = true;
             const numero = this.dataset.numero;
@@ -214,28 +147,6 @@ function openEditModal(data) {
             }
         });
     });
-
-    document.querySelectorAll('.scene-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function () {
-            hasUnsavedChanges = true;
-        });
-    });
-
-    document.getElementById('titulo_video').addEventListener('input', function () {
-        hasUnsavedChanges = true;
-    });
-
-    document.getElementById('descripcion_video').addEventListener('input', function () {
-        hasUnsavedChanges = true;
-    });
-
-    document.getElementById('editor_responsable').addEventListener('input', function () {
-        hasUnsavedChanges = true;
-    });
-
-    document.getElementById('main_scene').addEventListener('input', function () {
-        hasUnsavedChanges = true;
-    });
 }
 
 function closeEditModal() {
@@ -246,4 +157,134 @@ function closeEditModal() {
         localStorage.removeItem('editModalData');
         clearMessage();
     }
+}
+
+function showAbandonModal() {
+    const existing = document.querySelector('.abandon-modal-overlay');
+    if (existing) existing.remove();
+    
+    const html = `
+        <div class="abandon-modal-overlay">
+            <div class="abandon-modal">
+                <div class="abandon-modal-icon">⚠️</div>
+                <h3 style="color:#1a1a2e;font-size:1.2rem;margin-bottom:8px;">¿Deseas abandonar el modo de edición?</h3>
+                <p style="color:#555;font-size:0.9rem;margin-bottom:24px;">Los cambios no guardados se perderán.</p>
+                <div class="abandon-modal-actions">
+                    <button class="btn-abandon-yes">Sí, abandonar</button>
+                    <button class="btn-abandon-no">No, quedarme</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    const overlay = document.querySelector('.abandon-modal-overlay');
+    const yesBtn = overlay.querySelector('.btn-abandon-yes');
+    const noBtn = overlay.querySelector('.btn-abandon-no');
+    
+    yesBtn.addEventListener('click', function () {
+        overlay.remove();
+        localStorage.removeItem('editModalData');
+        window.location.href = 'index.html';
+    });
+    
+    noBtn.addEventListener('click', function () {
+        overlay.remove();
+        hasUnsavedChanges = true;
+    });
+    
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+            overlay.remove();
+            hasUnsavedChanges = true;
+        }
+    });
+}
+
+function showAbandonModalDesdeX() {
+    const existing = document.querySelector('.abandon-modal-overlay');
+    if (existing) existing.remove();
+    
+    const html = `
+        <div class="abandon-modal-overlay">
+            <div class="abandon-modal">
+                <div class="abandon-modal-icon">⚠️</div>
+                <h3 style="color:#1a1a2e;font-size:1.2rem;margin-bottom:8px;">¿Deseas abandonar el modo de edición?</h3>
+                <p style="color:#555;font-size:0.9rem;margin-bottom:24px;">Los cambios no guardados se perderán.</p>
+                <div class="abandon-modal-actions">
+                    <button class="btn-abandon-yes">Sí, abandonar</button>
+                    <button class="btn-abandon-no">No, quedarme</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    const overlay = document.querySelector('.abandon-modal-overlay');
+    const yesBtn = overlay.querySelector('.btn-abandon-yes');
+    const noBtn = overlay.querySelector('.btn-abandon-no');
+    
+    yesBtn.addEventListener('click', function () {
+        overlay.remove();
+        closeEditModal();
+    });
+    
+    noBtn.addEventListener('click', function () {
+        overlay.remove();
+    });
+    
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    });
+}
+
+function openPreviewModal(videoUrl) {
+    const existing = document.querySelector('.preview-modal-overlay');
+    if (existing) existing.remove();
+    
+    const html = `
+        <div class="preview-modal-overlay">
+            <div class="preview-modal">
+                <div class="preview-modal-header">
+                    <h2>🎬 Preview de la escena</h2>
+                    <button class="preview-modal-close">&times;</button>
+                </div>
+                <div class="preview-modal-body">
+                    <video controls preload="metadata" autoplay style="width:100%;max-height:70vh;background:#000;">
+                        <source src="${videoUrl}" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    const overlay = document.querySelector('.preview-modal-overlay');
+    const closeBtn = overlay.querySelector('.preview-modal-close');
+    
+    closeBtn.addEventListener('click', closePreviewModal);
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closePreviewModal();
+    });
+}
+
+function closePreviewModal() {
+    const overlay = document.querySelector('.preview-modal-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function refreshPreview(btn) {
+    btn.textContent = '↻ Actualizando...';
+    btn.disabled = true;
+    setTimeout(() => {
+        btn.textContent = '↻ Actualizar preview';
+        btn.disabled = false;
+    }, 2000);
 }

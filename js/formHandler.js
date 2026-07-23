@@ -22,32 +22,29 @@ form.addEventListener('submit', async function (e) {
     submitBtn.innerHTML = '<span class="spinner"></span>Procesando...';
 
     try {
-        const response = await fetch('https://n8n.ec.pe/webhook-test/init', {
+        // 1. Enviar datos iniciales (Respuesta inmediata)
+        const initResponse = await fetch('https://n8n.ec.pe/webhook/init', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, nota: noteUrl })
         });
 
-        let data;
-        try {
-            data = await response.json();
-        } catch (parseError) {
-            throw new Error('La respuesta del servidor no es un JSON válido');
+        if (!initResponse.ok) {
+            throw new Error(`Error en inicialización ${initResponse.status}`);
         }
 
-        if (!response.ok) {
-            if (data && data.error) {
-                showMessage(data.error, 'error');
-            } else {
-                showMessage(`Error ${response.status}: ${response.statusText}`, 'error');
-            }
-            return;
+        showMessage('Iniciando proceso... Obteniendo datos de la noticia.', 'info');
+
+        // 2. Llamar al endpoint de información directamente (sin polling)
+        const infoResponse = await fetch('https://devevents.elcomercio.pe/webhook/info-nota', {
+            method: 'GET'
+        });
+
+        if (!infoResponse.ok) {
+            throw new Error(`Error al obtener información ${infoResponse.status}`);
         }
 
-        if (data && data.error) {
-            showMessage(data.error, 'error');
-            return;
-        }
+        const data = await infoResponse.json();
 
         if (data && data.length > 0) {
             const responseData = data[0];
@@ -69,7 +66,7 @@ form.addEventListener('submit', async function (e) {
 
             openEditModal(responseData);
         } else {
-            showMessage('No se recibieron datos', 'error');
+            showMessage('No se recibieron datos de la noticia.', 'error');
         }
 
     } catch (error) {
