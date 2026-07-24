@@ -23,7 +23,7 @@ form.addEventListener('submit', async function (e) {
 
     try {
         // 1. Enviar datos iniciales (Respuesta inmediata)
-        const initResponse = await fetch('https://n8n.ec.pe/webhook/init', {
+        const initResponse = await fetch('https://n8n.ec.pe/webhook-test/edit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, nota: noteUrl })
@@ -33,28 +33,24 @@ form.addEventListener('submit', async function (e) {
             throw new Error(`Error en inicialización ${initResponse.status}`);
         }
 
-        showMessage('Iniciando proceso... Obteniendo datos de la noticia.', 'info');
-
-        // 2. Llamar al endpoint de información directamente (sin polling)
-        const infoResponse = await fetch('https://devevents.elcomercio.pe/webhook/info-nota', {
-            method: 'GET'
-        });
-
-        if (!infoResponse.ok) {
-            throw new Error(`Error al obtener información ${infoResponse.status}`);
-        }
-
-        const data = await infoResponse.json();
+        const data = await initResponse.json();
 
         if (data && data.length > 0) {
-            const responseData = data[0];
+            let responseData = data[0];
+
+            // Si el primer elemento es un array, tomamos el primer objeto de ese array
+            if (Array.isArray(responseData)) {
+                responseData = responseData[0];
+            }
+
+            console.log('Response data received:', responseData);
 
             if (!responseData || typeof responseData !== 'object') {
                 showMessage('Datos recibidos con formato inválido', 'error');
                 return;
             }
 
-            if (!responseData.noticia || typeof responseData.noticia !== 'object') {
+            if (!responseData.noticia || typeof responseData.noticia.titulo !== 'string') {
                 showMessage('Los datos no incluyen información de la noticia', 'error');
                 return;
             }
