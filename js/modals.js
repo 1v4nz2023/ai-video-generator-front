@@ -16,8 +16,8 @@ function showAbandonModal() {
         <div class="abandon-modal-overlay">
             <div class="abandon-modal">
                 <div class="abandon-modal-icon">⚠️</div>
-                <h3 style="color:#1a1a2e;font-size:1.2rem;margin-bottom:8px;">¿Deseas abandonar el modo de edición?</h3>
-                <p style="color:#555;font-size:0.9rem;margin-bottom:24px;">Los cambios no guardados se perderán.</p>
+                <h3>¿Deseas abandonar el modo de edición?</h3>
+                <p>Los cambios no guardados se perderán.</p>
                 <div class="abandon-modal-actions">
                     <button class="btn-abandon-yes">Sí, abandonar</button>
                     <button class="btn-abandon-no">No, quedarme</button>
@@ -59,8 +59,8 @@ function showAbandonModalDesdeX() {
         <div class="abandon-modal-overlay">
             <div class="abandon-modal">
                 <div class="abandon-modal-icon">⚠️</div>
-                <h3 style="color:#1a1a2e;font-size:1.2rem;margin-bottom:8px;">¿Deseas abandonar el modo de edición?</h3>
-                <p style="color:#555;font-size:0.9rem;margin-bottom:24px;">Los cambios no guardados se perderán.</p>
+                <h3>¿Deseas abandonar el modo de edición?</h3>
+                <p>Los cambios no guardados se perderán.</p>
                 <div class="abandon-modal-actions">
                     <button class="btn-abandon-yes">Sí, abandonar</button>
                     <button class="btn-abandon-no">No, quedarme</button>
@@ -103,7 +103,7 @@ function openPreviewModal(videoUrl) {
                     <button class="preview-modal-close">&times;</button>
                 </div>
                 <div class="preview-modal-body">
-                    <video controls preload="metadata" autoplay style="width:100%;max-height:70vh;background:#000;">
+                    <video class="preview-video" controls preload="metadata" autoplay>
                         <source src="${videoUrl}" type="video/mp4">
                     </video>
                 </div>

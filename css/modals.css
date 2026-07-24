@@ -1,0 +1,278 @@
+/* ===== Keyframes ===== */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* ===== Edit Modal Overlay ===== */
+.edit-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-edit);
+    animation: fadeIn var(--transition-normal) ease;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+}
+
+/* ===== Edit Modal ===== */
+.edit-modal {
+    background: var(--color-card);
+    border-radius: var(--radius-2xl);
+    width: 100%;
+    max-width: 800px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-2xl);
+    animation: slideUp var(--transition-normal) ease;
+}
+
+/* ===== Edit Modal Header ===== */
+.edit-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-xl) var(--spacing-2xl);
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.edit-modal-header h2 {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-3xl);
+}
+
+/* ===== Edit Modal Body ===== */
+.edit-modal-body {
+    padding: var(--spacing-2xl);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* ===== Edit Modal Footer ===== */
+.edit-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-2xl);
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+/* ===== Preview Modal Overlay ===== */
+.preview-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-edit);
+    animation: fadeIn var(--transition-normal) ease;
+    padding: var(--spacing-xl);
+}
+
+/* ===== Preview Modal ===== */
+.preview-modal {
+    background: var(--color-card);
+    border-radius: var(--radius-2xl);
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-2xl);
+    animation: slideUp var(--transition-normal) ease;
+}
+
+.preview-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-xl) var(--spacing-2xl);
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.preview-modal-header h2 {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-3xl);
+}
+
+.preview-modal-close {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--color-gray-100);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-3xl);
+    color: var(--color-text-medium);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.preview-modal-close:hover {
+    background: var(--color-gray-200);
+    color: var(--color-text-dark);
+}
+
+.preview-modal-body {
+    padding: var(--spacing-2xl);
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* ===== Save Alert Overlay ===== */
+.save-alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-save-alert);
+    animation: fadeIn var(--transition-normal) ease;
+    padding: var(--spacing-xl);
+}
+
+/* ===== Save Alert ===== */
+.save-alert {
+    background: var(--color-card);
+    border-radius: var(--radius-2xl);
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: var(--spacing-4xl) var(--spacing-3xl);
+    box-shadow: var(--shadow-2xl);
+    animation: slideUp var(--transition-normal) ease;
+    text-align: center;
+}
+
+.save-alert-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.save-alert h3 {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--spacing-sm);
+}
+
+.save-alert p {
+    color: var(--color-text-medium);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ===== Save Alert List ===== */
+.save-alert-list {
+    text-align: left;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-bottom: var(--spacing-lg);
+}
+
+.save-alert-list-title {
+    color: var(--color-text-light);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-bold);
+    margin-bottom: var(--spacing-sm);
+}
+
+.save-alert-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    border: 1px solid #eee;
+}
+
+.save-alert-item-title {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    margin-bottom: var(--spacing-xs);
+}
+
+.save-alert-item-desc {
+    color: var(--color-text-medium);
+    font-size: var(--font-size-xs);
+}
+
+/* ===== Abandon Modal Overlay ===== */
+.abandon-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-abandon);
+    animation: fadeIn var(--transition-normal) ease;
+    padding: var(--spacing-xl);
+}
+
+/* ===== Abandon Modal ===== */
+.abandon-modal {
+    background: var(--color-card);
+    border-radius: var(--radius-2xl);
+    width: 100%;
+    max-width: 420px;
+    padding: var(--spacing-4xl) var(--spacing-3xl);
+    box-shadow: var(--shadow-2xl);
+    animation: slideUp var(--transition-normal) ease;
+    text-align: center;
+}
+
+.abandon-modal-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.abandon-modal h3 {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--spacing-sm);
+}
+
+.abandon-modal p {
+    color: var(--color-text-medium);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-2xl);
+}
+
+.abandon-modal-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+}

@@ -1,0 +1,160 @@
+/* ===== Scenes Title ===== */
+.scenes-title {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--spacing-xl);
+}
+
+/* ===== Scene Card ===== */
+.scene-card {
+    background: var(--color-card);
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-2xl);
+    margin-bottom: var(--spacing-xl);
+    box-shadow: var(--shadow-md);
+    transition: opacity var(--transition-fast);
+}
+
+.scene-card.locked {
+    background: var(--color-locked);
+    opacity: 0.7;
+}
+
+.scene-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-lg);
+}
+
+.scene-card-header h3 {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-xl);
+}
+
+.scene-title-text {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+}
+
+/* ===== Scene Preview ===== */
+.scene-preview {
+    position: relative;
+    margin-bottom: var(--spacing-lg);
+}
+
+.scene-preview video {
+    width: 100%;
+    border-radius: var(--radius-lg);
+}
+
+.scene-preview-label {
+    position: absolute;
+    top: var(--spacing-sm);
+    left: var(--spacing-sm);
+    background: rgba(0, 0, 0, 0.7);
+    color: var(--color-white);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+}
+
+/* ===== Scene Include Checkbox ===== */
+.scene-include-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.scene-include-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.scene-include-checkbox label {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+}
+
+/* ===== Scene Dialogue Field ===== */
+.scene-dialogue-field {
+    margin-bottom: var(--spacing-lg);
+}
+
+.scene-dialogue-field label {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-xs);
+    display: block;
+}
+
+.scene-dialogue-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    resize: vertical;
+    transition: border-color var(--transition-fast);
+}
+
+.scene-dialogue-textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+/* ===== Locked Dialogue Box ===== */
+.locked-dialogue-box {
+    background: var(--color-locked);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.locked-dialogue-text {
+    color: var(--color-text-light);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.locked-warning {
+    color: var(--color-warning);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    margin-top: var(--spacing-xs);
+}
+
+/* ===== Word Counter ===== */
+.word-counter {
+    color: var(--color-text-light);
+    font-size: var(--font-size-xs);
+    text-align: right;
+    margin-top: var(--spacing-xs);
+}
+
+/* ===== Scene Checkbox ===== */
+.scene-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.scene-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.scene-checkbox label {
+    color: var(--color-text-dark);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}

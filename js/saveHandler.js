@@ -60,15 +60,15 @@ async function saveChanges() {
             <div class="save-alert-overlay">
                 <div class="save-alert">
                     <div class="save-alert-icon">${result.hubo_cambios ? '✅' : 'ℹ️'}</div>
-                    <h3 style="color:#1a1a2e;font-size:1.2rem;margin-bottom:8px;">${result.hubo_cambios ? 'Cambios guardados' : 'Sin cambios'}</h3>
-                    <p style="color:#555;font-size:0.9rem;margin-bottom:16px;">${escaparHTML(mensaje)}</p>
+                    <h3>${result.hubo_cambios ? 'Cambios guardados' : 'Sin cambios'}</h3>
+                    <p>${escaparHTML(mensaje)}</p>
                     ${dialogosActualizados.length > 0
                         ? `<div class="save-alert-list">
-                            <p style="color:#666;font-size:0.8rem;font-weight:600;margin-bottom:8px;">DIÁLOGOS ACTUALIZADOS:</p>
+                            <p class="save-alert-list-title">DIÁLOGOS ACTUALIZADOS:</p>
                             ${dialogosActualizados.map(d => `
                                 <div class="save-alert-item">
-                                    <p style="color:#1a1a2e;font-size:0.85rem;font-weight:600;margin-bottom:2px;">Escena ${d.numero}: ${escaparHTML(d.titulo)}</p>
-                                    <p style="color:#555;font-size:0.8rem;">${escaparHTML(d.dialogo_nuevo)}</p>
+                                    <p class="save-alert-item-title">Escena ${d.numero}: ${escaparHTML(d.titulo)}</p>
+                                    <p class="save-alert-item-desc">${escaparHTML(d.dialogo_nuevo)}</p>
                                 </div>
                             `).join('')}
                           </div>`

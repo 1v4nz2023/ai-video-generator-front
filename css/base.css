@@ -1,0 +1,94 @@
+/* ===== Reset ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ===== Body ===== */
+body {
+    font-family: var(--font-family);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+        115deg,
+        var(--color-bg-gradient-start) 0%,
+        var(--color-bg-gradient-start) 8%,
+        var(--color-bg-gradient-end) 20%,
+        var(--color-bg-gradient-mid) 50%,
+        var(--color-bg-gradient-end) 80%,
+        var(--color-bg-gradient-start) 92%,
+        var(--color-bg-gradient-start) 100%
+    );
+}
+
+/* ===== Container ===== */
+.container {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: var(--radius-3xl);
+    padding: var(--spacing-6xl) var(--spacing-7xl);
+    width: 560px;
+    box-shadow: var(--shadow-xl);
+}
+
+/* ===== Logo ===== */
+.logo {
+    display: block;
+    margin: 0 auto var(--spacing-lg);
+    max-width: 180px;
+    height: auto;
+}
+
+/* ===== Typography ===== */
+h1 {
+    color: var(--color-text-dark);
+    text-align: center;
+    margin-bottom: var(--spacing-xs);
+    font-size: var(--font-size-4xl);
+    font-weight: var(--font-weight-extrabold);
+}
+
+.subtitle {
+    color: var(--color-text-light);
+    text-align: center;
+    margin-bottom: var(--spacing-6xl);
+    font-size: var(--font-size-base);
+}
+
+/* ===== Form Elements ===== */
+.form-group {
+    margin-bottom: var(--spacing-2xl);
+}
+
+label {
+    display: block;
+    color: var(--color-text-medium);
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+}
+
+input {
+    width: 100%;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--color-text-medium);
+    font-size: var(--font-size-md);
+    outline: none;
+    transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+input::placeholder {
+    color: var(--color-border-lighter);
+}
+
+input:focus {
+    border-color: var(--color-primary-light);
+    box-shadow: 0 0 0 3px rgba(255, 203, 5, 0.2);
+}
