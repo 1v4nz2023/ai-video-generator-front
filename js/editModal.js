@@ -120,7 +120,7 @@ function buildEditForm(data) {
                     ${puedeEditar ? `
                         <div class="scene-dialogue-field">
                             <label>Diálogo (5–${maxPalabras} palabras)</label>
-                            <textarea id="${fieldName.dialogo}" placeholder="${escaparHTML(titulo)}" rows="3" class="scene-dialogue-textarea"></textarea>
+                            <textarea id="${fieldName.dialogo}" value="${escaparHTML(dialogue)}" rows="3" class="scene-dialogue-textarea">${escaparHTML(dialogue)}</textarea>
                             <div class="word-counter" data-numero="${fieldName.dialogo?.split('_').pop() || ''}">
                                 ${dialogue ? (dialogue.split(/\s+/).filter(Boolean).length) : 0} / ${maxPalabras} palabras
                             </div>
@@ -139,15 +139,15 @@ function buildEditForm(data) {
 
     return `
         <div class="edit-modal-overlay">
-            <div class="edit-modal modal-overlay-structure" data-produccion-id="${escaparHTML(produccion_id)}">
-                <div class="edit-modal-header modal-header-structure">
+            <div class="edit-modal" data-produccion-id="${escaparHTML(produccion_id)}">
+                <div class="edit-modal-header">
                     <h2>✏️ Editar ${es_video ? 'Escenas' : 'Viñetas'}</h2>
                     <button id="btnCloseEditModal" type="button" class="modal-close-icon">&times;</button>
                 </div>
-                <div class="edit-modal-body modal-body-structure">
+                <div class="edit-modal-body">
                     ${formHTML}
                 </div>
-                <div class="edit-modal-footer modal-footer-structure">
+                <div class="edit-modal-footer">
                     <p id="summary_included" class="summary-text"></p>
                     <div class="footer-actions">
                         <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
