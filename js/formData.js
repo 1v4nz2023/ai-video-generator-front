@@ -16,28 +16,36 @@ function getFormData() {
         formMode: 'edit'
     };
 
-    const dialogos = {};
+    const escenas = [];
 
-    // We need to find the checkboxes and textareas for scenes.
-    // Since they are dynamic, we look for elements with data-numero.
-    const sceneCheckboxes = document.querySelectorAll('.scene-checkbox');
-    sceneCheckboxes.forEach(checkbox => {
-        const numero = checkbox.dataset.numero;
+    sceneCards.forEach(card => {
+        const checkbox = card.querySelector('.scene-checkbox');
+        const numero = checkbox?.dataset.numero;
+        const textarea = card.querySelector('.scene-dialogue-textarea');
+        const lockedDialogueText = card.querySelector('.locked-dialogue-text');
+        const dialogo = textarea?.value ?? (lockedDialogueText?.textContent ?? '');
+        const incluido = checkbox?.checked ?? false;
+        const titulo = card?.getAttribute('data-titulo') || '';
+        const itemId = card?.getAttribute('data-item-id') || '';
+        const produccionId = card?.getAttribute('data-produccion-id') || '';
+        const previewUrl = card?.getAttribute('data-preview-url') || '';
+
         if (numero) {
-            const incluido = checkbox.checked;
-            const textarea = document.getElementById(`dialogo_escena_${numero}`);
-            const dialogo = textarea?.value ?? '';
-
-            dialogos[numero] = {
-                numero,
+            escenas.push({
+                numero: Number(numero),
+                titulo,
                 dialogue: dialogo,
-                incluido
-            };
-
-            payload[`dialogo_escena_${numero}`] = dialogo;
-            payload[`incluido_escena_${numero}`] = incluido ? ['Incluir'] : [];
+                incluido,
+                item_id: itemId,
+                produccion_id: produccionId,
+                previewUrl
+            });
         }
     });
+
+    if (escenas.length > 0) {
+        payload.escenas = escenas;
+    }
 
     return payload;
 }
@@ -46,7 +54,7 @@ function actualizarContadoresEdicion() {
     const sceneCards = document.querySelectorAll('.scene-card');
     
     sceneCards.forEach(card => {
-        const textarea = card.querySelector('.scene-dialogue');
+        const textarea = card.querySelector('.scene-dialogue-textarea');
         if (!textarea) return;
         
         const numero = textarea.dataset.numero;
@@ -67,7 +75,7 @@ function actualizarContadoresEdicion() {
             const limiteEl = card.querySelector(`.limite-alcanzado[data-numero="${numero}"]`);
             if (limiteEl) limiteEl.style.display = 'inline';
             
-            const dialogueField = textarea.closest('.scene-field');
+            const dialogueField = textarea.closest('.scene-dialogue-field');
             const wordCounter = dialogueField.querySelector('.word-counter');
             const valorFinal = actual;
             
@@ -75,7 +83,7 @@ function actualizarContadoresEdicion() {
             if (wordCounter) wordCounter.remove();
             
             const locked = document.createElement('p');
-            locked.className = 'locked-dialogue';
+            locked.className = 'locked-dialogue-text';
             locked.textContent = valorFinal;
             dialogueField.appendChild(locked);
         }

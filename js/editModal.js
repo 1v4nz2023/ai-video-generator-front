@@ -34,11 +34,12 @@ function buildEditForm(data) {
 
     // --- 2. Preview de video principal ---
     if (video_url) {
+        const cacheBuster = `t=${Date.now()}`;
         formHTML += `
             <div class="video-preview-card">
                 <h3>🎬 Preview de Video Principal</h3>
                 <video class="main-video" controls preload="metadata" width="100%">
-                    <source src="${escaparHTML(video_url)}" type="video/mp4">
+                    <source src="${escaparHTML(video_url)}?${cacheBuster}" type="video/mp4">
                 </video>
             </div>`;
     }
@@ -70,7 +71,7 @@ function buildEditForm(data) {
                 </div>
                 <div class="config-field">
                     <label>📋 Descripción del video</label>
-                    <textarea id="descripcion_video" placeholder="${escaparHTML(noticia?.subtitulo ?? '')}" rows="2"></textarea>
+                    <textarea id="descripcion_video" rows="2">${escaparHTML(noticia?.subtitulo ?? '')}</textarea>
                 </div>
                 <div class="config-field">
                     <label>👤 Editor responsable</label>
@@ -78,7 +79,7 @@ function buildEditForm(data) {
                 </div>
                 <div class="config-field">
                     <label>🧠 Prompt maestro (Inglés)</label>
-                    <textarea id="main_scene" placeholder="${escaparHTML(main_scene ?? '')}" rows="2"></textarea>
+                    <textarea id="main_scene" rows="2">${escaparHTML(main_scene ?? '')}</textarea>
                 </div>
             </div>
         </div>`;
@@ -87,13 +88,14 @@ function buildEditForm(data) {
     if (escenas && Array.isArray(escenas)) {
         formHTML += `<h2 class="scenes-title">✏️ Editar ${es_video ? "Escenas" : "Viñetas"}</h2>`;
         escenas.forEach((escena, idx) => {
-            const { numero, titulo, dialogue, incluido, fieldName, reglasDialogo, previewUrl } = escena;
+            const { numero, titulo, dialogue, incluido, fieldName, reglasDialogo, previewUrl, item_id, produccion_id } = escena;
             const puedeEditar = (Number(escena.ediciones ?? 0) < 3);
             const maxPalabras = reglasDialogo?.maxPalabras || 16;
 
             const lockedClass = !puedeEditar ? ' locked' : '';
+            const sceneId = `scene-${item_id || numero}`;
             formHTML += `
-                <div class="scene-card${lockedClass}">
+                <div id="${sceneId}" class="scene-card${lockedClass}" data-produccion-id="${escaparHTML(produccion_id)}" data-item-id="${escaparHTML(item_id)}" data-preview-url="${escaparHTML(previewUrl ?? '')}" data-titulo="${escaparHTML(titulo)}">
                     <div class="scene-card-header">
                         <h3>${es_video ? '🎬' : '🖼️'} ${es_video ? 'Escena' : 'Viñeta'} ${numero}</h3>
                         <span class="edition-badge">Ediciones: ${escena.ediciones ?? 0} / 3</span>
@@ -101,18 +103,9 @@ function buildEditForm(data) {
                     
                     <p class="scene-title-text">${escaparHTML(titulo)}</p>
 
-                    ${previewUrl ? `
-                        <div class="scene-preview">
-                            <p class="scene-preview-label">Preview de la escena:</p>
-                            <video class="scene-preview-video" controls preload="metadata" width="100%">
-                                <source src="${escaparHTML(previewUrl)}" type="video/mp4">
-                            </video>
-                        </div>
-                    ` : ''}
-
                     ${fieldName?.incluido ? `
                         <div class="scene-include-checkbox">
-                            <input type="checkbox" class="scene-checkbox" id="${fieldName.incluido}" ${incluido ? 'checked' : ''}>
+                            <input type="checkbox" class="scene-checkbox" id="${fieldName.incluido}" data-numero="${numero}" ${incluido ? 'checked' : ''}>
                             <label for="${fieldName.incluido}">Incluir en el video</label>
                         </div>
                     ` : ''}
@@ -120,7 +113,7 @@ function buildEditForm(data) {
                     ${puedeEditar ? `
                         <div class="scene-dialogue-field">
                             <label>Diálogo (5–${maxPalabras} palabras)</label>
-                            <textarea id="${fieldName.dialogo}" value="${escaparHTML(dialogue)}" rows="3" class="scene-dialogue-textarea">${escaparHTML(dialogue)}</textarea>
+                            <textarea id="${fieldName.dialogo}" value="${escaparHTML(dialogue)}" rows="3" class="scene-dialogue-textarea" data-numero="${numero}">${escaparHTML(dialogue)}</textarea>
                             <div class="word-counter" data-numero="${fieldName.dialogo?.split('_').pop() || ''}">
                                 ${dialogue ? (dialogue.split(/\s+/).filter(Boolean).length) : 0} / ${maxPalabras} palabras
                             </div>
@@ -133,6 +126,11 @@ function buildEditForm(data) {
                             </div>
                         </div>
                     `}
+
+                    <div class="scene-actions">
+                        <button type="button" class="btn-scene-preview" data-numero="${numero}">🎬 Ver Preview</button>
+                        <button type="button" class="btn-scene-regenerate" data-numero="${numero}">🔄 Regenerar Escena</button>
+                    </div>
                 </div>`;
         });
     }
@@ -202,16 +200,66 @@ function openEditModal(data) {
         }
     });
     
-    overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) {
-            if (hasUnsavedChanges) {
-                showAbandonModalDesdeX();
-            } else {
-                closeEditModal();
-            }
-        }
-    });
+    // No cerrar el modal al hacer clic fuera de él
     
+    // Botones de escena: Ver Preview y Regenerar
+    document.querySelectorAll('.btn-scene-preview').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const numero = this.getAttribute('data-numero');
+            const sceneCard = this.closest('.scene-card');
+            const previewUrl = sceneCard?.getAttribute('data-preview-url');
+            const titulo = sceneCard?.getAttribute('data-titulo');
+
+            // Cerrar modal de preview si ya está abierto
+            const existing = document.querySelector('.scene-preview-modal-overlay');
+            if (existing) existing.remove();
+
+            const html = `
+                <div class="scene-preview-modal-overlay">
+                    <div class="scene-preview-modal">
+                        <div class="scene-preview-modal-header">
+                            <h3>🎬 Preview - Escena ${numero}</h3>
+                            <button type="button" class="scene-preview-modal-close">&times;</button>
+                        </div>
+                        <div class="scene-preview-modal-body">
+                            <p class="scene-preview-modal-title">${escaparHTML(titulo)}</p>
+                            ${previewUrl ? `
+                                <video class="scene-preview-modal-video" controls preload="metadata" width="100%">
+                                    <source src="${escaparHTML(previewUrl)}?t=${Date.now()}" type="video/mp4">
+                                </video>
+                            ` : '<p class="no-preview-text">No hay preview disponible</p>'}
+                        </div>
+                    </div>
+                </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+
+            const overlay = document.querySelector('.scene-preview-modal-overlay');
+            const closeBtn = overlay.querySelector('.scene-preview-modal-close');
+
+            closeBtn.addEventListener('click', function () {
+                overlay.remove();
+            });
+
+            overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            });
+        });
+    });
+
+    document.querySelectorAll('.btn-scene-regenerate').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const numero = this.getAttribute('data-numero');
+            const sceneCard = this.closest('.scene-card');
+            const produccionId = sceneCard?.getAttribute('data-produccion-id');
+            const itemId = sceneCard?.getAttribute('data-item-id');
+            console.log('Regenerar Escena - Producción ID:', produccionId);
+            console.log('Regenerar Escena - Item ID:', itemId);
+        });
+    });
+
     saveBtn.addEventListener('click', saveChanges);
     
     document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {

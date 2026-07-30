@@ -3,10 +3,11 @@ async function saveChanges() {
     const sceneData = [];
 
     sceneCards.forEach(card => {
-        const numero = card.querySelector('.scene-checkbox')?.dataset.numero;
-        const textarea = card.querySelector('.scene-dialogue');
-        const lockedDialogue = card.querySelector('.locked-dialogue');
-        const dialogo = textarea?.value ?? (lockedDialogue?.textContent ?? '');
+        const checkbox = card.querySelector('.scene-checkbox');
+        const numero = checkbox?.dataset.numero;
+        const textarea = card.querySelector('.scene-dialogue-textarea');
+        const lockedDialogueText = card.querySelector('.locked-dialogue-text');
+        const dialogo = textarea?.value ?? (lockedDialogueText?.textContent ?? '');
         const words = String(dialogo).split(/\s+/).filter(Boolean).length;
 
         if (words > 0) {
@@ -31,7 +32,7 @@ async function saveChanges() {
     const data = getFormData();
 
     try {
-        const response = await fetch('https://n8n.ec.pe/webhook/save-edits', {
+        const response = await fetch(`${DOMAIN}/webhook-test/save-edits`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
