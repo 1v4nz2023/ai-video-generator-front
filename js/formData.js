@@ -1,17 +1,14 @@
 function getFormData() {
     const sceneCards = document.querySelectorAll('.scene-card');
     const payload = {
-        email: document.getElementById('email').value.trim().toLowerCase(),
         nota: document.getElementById('noteUrl').value.trim(),
         produccion_id: document.querySelector('.edit-modal')?.dataset?.produccionId || '',
-        titulo_noticia: document.getElementById('titulo_noticia')?.value?.trim() || '',
-        subtitulo_noticia: document.getElementById('subtitulo_noticia')?.value?.trim() || '',
-        email_editor: document.getElementById('email_editor')?.value?.trim() || '',
-        url_noticia: document.getElementById('url_noticia')?.value?.trim() || '',
+        email_editor: document.getElementById('email')?.value?.trim() || '',
         titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
         descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
         editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
         main_scene: document.getElementById('main_scene')?.value?.trim() || '',
+        imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
         submittedAt: new Date().toISOString(),
         formMode: 'edit'
     };

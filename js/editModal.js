@@ -46,17 +46,19 @@ function buildEditForm(data) {
 
     // --- 3. Selector de imagen ---
     if (imagenes && imagenes.length > 0 && es_video) {
+        const defaultImgUrl = imagenes[0]?.url || '';
         formHTML += `
             <div class="image-selector-card">
                 <h3>🖼️ Seleccionar Imagen de la Nota</h3>
                 <div class="image-grid">
                     ${imagenes.map((img, index) => `
-                        <div onclick="selectThumbnail(${index})" id="thumb-${index}" class="image-thumb">
+                        <div onclick="selectThumbnail(${index})" id="thumb-${index}" class="image-thumb${index === 0 ? ' selected' : ''}">
                             <img src="${escaparHTML(img.url)}">
                         </div>
                     `).join("")}
                 </div>
                 <input type="hidden" id="imagen_seleccionada" value="Imagen 1">
+                <input type="hidden" id="imagen_seleccionada_url" value="${escaparHTML(defaultImgUrl)}">
             </div>`;
     }
 
@@ -160,11 +162,17 @@ function buildEditForm(data) {
 window.selectThumbnail = function(index) {
     document.querySelectorAll('[id^="thumb-"]').forEach(el => {
         el.style.borderColor = 'transparent';
+        el.classList.remove('selected');
     });
     const selected = document.getElementById(`thumb-${index}`);
     if (selected) {
-        selected.style.borderColor = '#E30613'; // --color-primary
+        selected.style.borderColor = '#E30613';
+        selected.classList.add('selected');
+        const img = selected.querySelector('img');
         document.getElementById('imagen_seleccionada').value = `Imagen ${index + 1}`;
+        if (img && document.getElementById('imagen_seleccionada_url')) {
+            document.getElementById('imagen_seleccionada_url').value = img.src;
+        }
     }
 };
 
