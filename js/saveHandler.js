@@ -1,3 +1,73 @@
+function mostrarErrorAlert(message) {
+    const errorHTML = `
+        <div class="error-alert-overlay">
+            <div class="error-alert">
+                <div class="error-alert-icon">❌</div>
+                <h3>Error</h3>
+                <p>${escaparHTML(message)}</p>
+                <button class="btn-error-alert-close">Cerrar</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', errorHTML);
+    const overlay = document.querySelector('.error-alert-overlay');
+    const closeBtn = overlay?.querySelector('.btn-error-alert-close');
+    closeBtn?.addEventListener('click', () => overlay?.remove());
+    overlay?.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+}
+
+function actualizarEscenasUI(scenesData) {
+    scenesData.forEach(scene => {
+        const sceneId = `scene-${scene.item_id}`;
+        const card = document.getElementById(sceneId);
+        if (!card) return;
+
+        // Update edition badge
+        const badge = card.querySelector('.edition-badge');
+        if (badge) {
+            badge.textContent = `Ediciones: ${scene.ediciones ?? 0} / 3`;
+        }
+
+        // Update dialogue textarea
+        const fieldName = `dialogo_escena_${scene.numero}`;
+        const textarea = card.querySelector(`#${escaparHTML(fieldName)}`);
+        if (textarea) {
+            textarea.value = scene.dialogue ?? '';
+            // Update word counter
+            const counter = card.querySelector('.word-counter');
+            if (counter) {
+                const words = (scene.dialogue ?? '').split(/\s+/).filter(Boolean).length;
+                const maxWords = 16;
+                counter.textContent = `${words} / ${maxWords} palabras`;
+            }
+        }
+
+        // Update included checkbox
+        const checkbox = card.querySelector('.scene-checkbox');
+        if (checkbox) {
+            checkbox.checked = scene.incluido ?? false;
+        }
+
+        // Lock card if max editions reached
+        const puedeEditar = (Number(scene.ediciones ?? 0) < 3);
+        if (!puedeEditar && !card.classList.contains('locked')) {
+            card.classList.add('locked');
+            const dialogueField = card.querySelector('.scene-dialogue-field');
+            if (dialogueField) {
+                const lockedBox = document.createElement('div');
+                lockedBox.className = 'locked-dialogue-box';
+                lockedBox.innerHTML = `
+                    <p class="locked-dialogue-text">${escaparHTML(scene.dialogue ?? '')}</p>
+                    <div class="locked-warning">🔒 Límite de ediciones alcanzado</div>
+                `;
+                dialogueField.replaceWith(lockedBox);
+            }
+        }
+    });
+}
+
 async function saveChanges() {
     const sceneCards = document.querySelectorAll('.scene-card');
     const sceneData = [];
@@ -30,23 +100,37 @@ async function saveChanges() {
     btn.innerHTML = '<span class="spinner"></span>Guardando...';
 
     const data = getFormData();
+    console.log('Payload enviado:', JSON.stringify(data, null, 2));
 
     try {
-        const response = await fetch(`${DOMAIN}/webhook-test/save-edits`, {
+        const response = await fetch(`${DOMAIN}/webhook/save-edits`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
 
         if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+            let errorMessage = `Error ${response.status}: ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message ?? errorData.mensaje ?? errorMessage;
+            } catch {
+                // Si no es JSON, usar el mensaje de status
+            }
+            mostrarErrorAlert(errorMessage);
+            btn.disabled = false;
+            btn.textContent = 'Guardar cambios';
+            return;
         }
 
         let result;
         try {
             result = await response.json();
         } catch (parseError) {
-            throw new Error('La respuesta del servidor no es un JSON válido');
+            mostrarErrorAlert('La respuesta del servidor no es un JSON válido');
+            btn.disabled = false;
+            btn.textContent = 'Guardar cambios';
+            return;
         }
 
         actualizarContadoresEdicion();
@@ -54,27 +138,20 @@ async function saveChanges() {
         hasUnsavedChanges = false;
         localStorage.removeItem('editModalData');
 
-        const mensaje = result.mensaje ?? 'Operación completada sin mensaje';
-        const dialogosActualizados = Array.isArray(result.dialogos_actualizados) ? result.dialogos_actualizados : [];
+        const mensaje = result.message ?? result.mensaje ?? 'Datos guardados correctamente';
+        const mensajeLower = mensaje.toLowerCase();
+        const esSinCambios = mensajeLower.includes('sin cambios') || 
+                             mensajeLower.includes('no se aplicó') || 
+                             mensajeLower.includes('no se aplico') || 
+                             mensajeLower.includes('modificación alguna') || 
+                             mensajeLower.includes('modificacion alguna');
 
         const summaryHTML = `
             <div class="save-alert-overlay">
                 <div class="save-alert">
-                    <div class="save-alert-icon">${result.hubo_cambios ? '✅' : 'ℹ️'}</div>
-                    <h3>${result.hubo_cambios ? 'Cambios guardados' : 'Sin cambios'}</h3>
+                    <div class="save-alert-icon">${esSinCambios ? 'ℹ️' : '✅'}</div>
+                    <h3>${esSinCambios ? 'Sin cambios' : 'Guardado con éxito'}</h3>
                     <p>${escaparHTML(mensaje)}</p>
-                    ${dialogosActualizados.length > 0
-                        ? `<div class="save-alert-list">
-                            <p class="save-alert-list-title">DIÁLOGOS ACTUALIZADOS:</p>
-                            ${dialogosActualizados.map(d => `
-                                <div class="save-alert-item">
-                                    <p class="save-alert-item-title">Escena ${d.numero}: ${escaparHTML(d.titulo)}</p>
-                                    <p class="save-alert-item-desc">${escaparHTML(d.dialogo_nuevo)}</p>
-                                </div>
-                            `).join('')}
-                          </div>`
-                        : ''
-                    }
                     <button class="btn-save-alert-close">Cerrar</button>
                 </div>
             </div>
@@ -82,14 +159,31 @@ async function saveChanges() {
 
         document.body.insertAdjacentHTML('beforeend', summaryHTML);
 
-        const overlay = document.querySelector('.save-alert-overlay');
+        const overlays = document.querySelectorAll('.save-alert-overlay');
+        const overlay = overlays[overlays.length - 1];
         const closeBtn = overlay.querySelector('.btn-save-alert-close');
 
-        closeBtn.addEventListener('click', function () {
-            overlay.remove();
-        });
+        if (closeBtn) {
+            closeBtn.addEventListener('click', async function () {
+                if (!esSinCambios && data.produccion_id) {
+                    try {
+                        const response = await fetch(`${DOMAIN}/webhook/get-edit?production_id=${encodeURIComponent(data.produccion_id)}`);
+                        if (response.ok) {
+                            const scenesData = await response.json();
+                            if (Array.isArray(scenesData) && scenesData.length > 0) {
+                                actualizarEscenasUI(scenesData);
+                            }
+                        }
+                    } catch (fetchError) {
+                        console.warn('Error al llamar get-edit:', fetchError.message);
+                    }
+                }
+                overlay.remove();
+            });
+        }
 
-        overlay.addEventListener('click', function (e) {
+        // Close on overlay click
+        overlay?.addEventListener('click', (e) => {
             if (e.target === overlay) overlay.remove();
         });
 

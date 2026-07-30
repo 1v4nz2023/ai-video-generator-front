@@ -225,6 +225,56 @@
     font-size: var(--font-size-xs);
 }
 
+/* ===== Error Alert Overlay ===== */
+.error-alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-save-alert);
+    animation: fadeIn var(--transition-normal) ease;
+    padding: var(--spacing-xl);
+}
+
+/* ===== Error Alert ===== */
+.error-alert {
+    background: var(--color-card);
+    border-radius: var(--radius-2xl);
+    width: 100%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: var(--spacing-4xl) var(--spacing-3xl);
+    box-shadow: var(--shadow-2xl);
+    animation: slideUp var(--transition-normal) ease;
+    text-align: center;
+    border: 2px solid var(--color-error);
+}
+
+.error-alert-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-lg);
+}
+
+.error-alert h3 {
+    color: var(--color-error);
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--spacing-sm);
+}
+
+.error-alert p {
+    color: var(--color-text-medium);
+    font-size: var(--font-size-base);
+    margin-bottom: var(--spacing-lg);
+    word-break: break-word;
+}
+
 /* ===== Abandon Modal Overlay ===== */
 .abandon-modal-overlay {
     position: fixed;
