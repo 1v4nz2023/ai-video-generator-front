@@ -8,6 +8,48 @@ function escaparHTML(texto) {
         .replace(/'/g, "&#039;");
 }
 
+function verVideoPrincipal() {
+    const btn = document.querySelector('.btn-ver-video');
+    if (!btn) return;
+    
+    const videoUrl = btn.getAttribute('data-video-url');
+    if (!videoUrl) return;
+
+    // Cerrar modal de video si ya está abierto
+    const existing = document.querySelector('.main-video-preview-modal-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="main-video-preview-modal-overlay">
+            <div class="main-video-preview-modal">
+                <div class="main-video-preview-modal-header">
+                    <h3>🎬 Video Principal</h3>
+                    <button type="button" class="main-video-preview-modal-close">&times;</button>
+                </div>
+                <div class="main-video-preview-modal-body">
+                    <video class="main-video-preview-modal-video" controls preload="metadata" width="100%">
+                        <source src="${escaparHTML(videoUrl)}?t=${Date.now()}" type="video/mp4">
+                    </video>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const overlay = document.querySelector('.main-video-preview-modal-overlay');
+    const closeBtn = overlay.querySelector('.main-video-preview-modal-close');
+
+    closeBtn.addEventListener('click', function () {
+        overlay.remove();
+    });
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    });
+}
+
 function buildEditForm(data) {
     const {
         formato, es_video, etiqueta_contenido, 
@@ -34,13 +76,13 @@ function buildEditForm(data) {
 
     // --- 2. Preview de video principal ---
     if (video_url) {
-        const cacheBuster = `t=${Date.now()}`;
         formHTML += `
             <div class="video-preview-card">
                 <h3>🎬 Preview de Video Principal</h3>
-                <video class="main-video" controls preload="metadata" width="100%">
-                    <source src="${escaparHTML(video_url)}?${cacheBuster}" type="video/mp4">
-                </video>
+                <button class="btn-ver-video" data-video-url="${escaparHTML(video_url)}">
+                    🎥 Ver Video
+                </button>
+                <div id="video-container" style="margin-top: 12px;"></div>
             </div>`;
     }
 
@@ -66,6 +108,7 @@ function buildEditForm(data) {
     formHTML += `
         <div class="config-section">
             <h3>⚙️ Configuración de Producción</h3>
+            <input type="hidden" id="formato" value="${escaparHTML(formato || 'historieta')}">
             <div class="config-grid">
                 <div class="config-field">
                     <label>📝 Título del video</label>
@@ -79,16 +122,23 @@ function buildEditForm(data) {
                     <label>👤 Editor responsable</label>
                     <input type="text" id="editor_responsable" value="${escaparHTML(editor_responsable ?? '')}">
                 </div>
+                ${formato !== 'historieta' ? `
                 <div class="config-field">
                     <label>🧠 Prompt maestro (Inglés)</label>
                     <textarea id="main_scene" rows="2">${escaparHTML(main_scene ?? '')}</textarea>
-                </div>
+                </div>` : ''}
             </div>
         </div>`;
 
     // --- 5. Lista de escenas/viñetas ---
     if (escenas && Array.isArray(escenas)) {
-        formHTML += `<h2 class="scenes-title">✏️ Editar ${es_video ? "Escenas" : "Viñetas"}</h2>`;
+        formHTML += `
+            <div class="scenes-section">
+                <h2 class="scenes-title">✏️ Editar ${es_video ? "Escenas" : "Viñetas"}</h2>
+                <div class="scenes-toolbar">
+                    <button type="button" class="btn-select-all" id="btnSelectAll">Seleccionar todos</button>
+                </div>
+            </div>`;
         escenas.forEach((escena, idx) => {
             const { numero, titulo, dialogue, incluido, fieldName, reglasDialogo, previewUrl, item_id, produccion_id } = escena;
             const puedeEditar = (Number(escena.ediciones ?? 0) < 3);
@@ -131,7 +181,7 @@ function buildEditForm(data) {
 
                     <div class="scene-actions">
                         <button type="button" class="btn-scene-preview" data-numero="${numero}">🎬 Ver Preview</button>
-                        <button type="button" class="btn-scene-regenerate" data-numero="${numero}">🔄 Regenerar Escena</button>
+                        ${puedeEditar ? `<button type="button" class="btn-scene-regenerate" data-numero="${numero}" data-ediciones="${escena.ediciones ?? 0}" ${(escena.ediciones ?? 0) >= 3 ? 'disabled' : ''}>🔄 Regenerar Escena con IA</button>` : ''}
                     </div>
                 </div>`;
         });
@@ -139,7 +189,7 @@ function buildEditForm(data) {
 
     return `
         <div class="edit-modal-overlay">
-            <div class="edit-modal" data-produccion-id="${escaparHTML(produccion_id)}">
+            <div class="edit-modal" data-produccion-id="${escaparHTML(produccion_id)}" data-noticia-id="${escaparHTML(noticia_id)}">
                 <div class="edit-modal-header">
                     <h2>✏️ Editar ${es_video ? 'Escenas' : 'Viñetas'}</h2>
                     <button id="btnCloseEditModal" type="button" class="modal-close-icon">&times;</button>
@@ -152,6 +202,7 @@ function buildEditForm(data) {
                     <div class="footer-actions">
                         <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
                         <button class="btn-save" id="btnSave">Guardar cambios</button>
+                        <button class="btn-generate-video" id="btnGenerateVideo">Regenerar video</button>
                     </div>
                 </div>
             </div>
@@ -198,6 +249,31 @@ function openEditModal(data) {
         closeEditModal();
         showMessage('Error al abrir el modal. Por favor, intenta de nuevo.', 'error');
         return;
+    }
+    
+    // Capturar valores iniciales para detectar cambios
+    capturarValoresIniciales();
+    
+    // Botón Seleccionar todos / Deseleccionar todos
+    const btnSelectAll = document.getElementById('btnSelectAll');
+    if (btnSelectAll) {
+        btnSelectAll.addEventListener('click', function () {
+            const checkboxes = document.querySelectorAll('.scene-checkbox');
+            if (checkboxes.length === 0) return;
+            
+            // Verificar si todos están marcados
+            const todosMarcados = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(cb => {
+                cb.checked = !todosMarcados;
+            });
+            
+            // Actualizar texto del botón
+            this.textContent = !todosMarcados ? 'Deseleccionar todos' : 'Seleccionar todos';
+            
+            // Marcar como cambios no guardados
+            hasUnsavedChanges = true;
+        });
     }
     
     closeBtn.addEventListener('click', function () {
@@ -258,17 +334,178 @@ function openEditModal(data) {
     });
 
     document.querySelectorAll('.btn-scene-regenerate').forEach(btn => {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', async function () {
             const numero = this.getAttribute('data-numero');
             const sceneCard = this.closest('.scene-card');
             const produccionId = sceneCard?.getAttribute('data-produccion-id');
             const itemId = sceneCard?.getAttribute('data-item-id');
-            console.log('Regenerar Escena - Producción ID:', produccionId);
-            console.log('Regenerar Escena - Item ID:', itemId);
+            const ediciones = Number(this.getAttribute('data-ediciones')) ?? 0;
+            const maxEdits = 3;
+
+            if (ediciones >= maxEdits) {
+                mostrarErrorAlert(`Esta escena ya alcanzó el máximo de ${maxEdits} ediciones permitidas.`);
+                return;
+            }
+
+            const previewUrl = sceneCard?.getAttribute('data-preview-url') || '';
+            const titulo = sceneCard?.getAttribute('data-titulo') || '';
+
+            const textarea = sceneCard?.querySelector('.scene-dialogue-textarea');
+            const dialogo = textarea?.value?.trim() || '';
+
+            const words = String(dialogo).split(/\s+/).filter(Boolean).length;
+            if (words === 0) {
+                mostrarErrorAlert('No hay diálogo para regenerar la escena.');
+                return;
+            } else if (words < 5 || words > 16) {
+                mostrarErrorAlert(`La escena ${numero} tiene ${words} palabras. Mínimo 5, máximo 16 palabras.`);
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner"></span>Regenerando...';
+
+            try {
+                const response = await fetch(`${DOMAIN}/webhook/regenerate-scene`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        produccion_id: produccionId,
+                        noticia_id: document.querySelector('.edit-modal')?.dataset?.noticiaId || '',
+                        item_id: itemId,
+                        numero: Number(numero),
+                        dialogo: dialogo,
+                        titulo: titulo,
+                        previewUrl: previewUrl,
+                        ediciones: ediciones,
+                        formato: document.getElementById('formato')?.value?.trim() || 'historieta',
+                        imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || ''
+                    })
+                });
+
+                const result = await response.json();
+
+                // Verificar si el response es un array con ok: false
+                if (Array.isArray(result) && result.length > 0 && result[0].ok === false) {
+                    mostrarErrorAlert(result[0].message ?? 'Error al regenerar escena');
+                } else if (!response.ok) {
+                    let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                    try {
+                        errorMessage = result.message ?? result.mensaje ?? errorMessage;
+                    } catch {
+                        // Si no es JSON, usar el mensaje de status
+                    }
+                    mostrarErrorAlert(`Error al regenerar escena: ${errorMessage}`);
+                } else {
+                    mostrarRegenerarSuccessModal(result.message ?? result.mensaje ?? 'Escena regenerada con éxito');
+                }
+            } catch (error) {
+                mostrarErrorAlert(`Error de conexión: ${error.message}`);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '🔄 Regenerar Escena con IA';
+            }
         });
     });
 
+    // Botón Ver Video Principal
+    const btnVerVideo = document.querySelector('.btn-ver-video');
+    if (btnVerVideo) {
+        btnVerVideo.addEventListener('click', function () {
+            verVideoPrincipal();
+        });
+    }
+
     saveBtn.addEventListener('click', saveChanges);
+
+    const btnGenerateVideo = document.getElementById('btnGenerateVideo');
+    if (btnGenerateVideo) {
+        btnGenerateVideo.addEventListener('click', async function () {
+            const sceneCards = document.querySelectorAll('.scene-card');
+            const includedScenes = [];
+
+            sceneCards.forEach(card => {
+                const checkbox = card.querySelector('.scene-checkbox');
+                const numero = checkbox?.dataset.numero;
+                const textarea = card.querySelector('.scene-dialogue-textarea');
+                const lockedDialogueText = card.querySelector('.locked-dialogue-text');
+                const dialogo = textarea?.value ?? (lockedDialogueText?.textContent ?? '');
+                const incluido = checkbox?.checked ?? false;
+                const titulo = card?.getAttribute('data-titulo') || '';
+                const itemId = card?.getAttribute('data-item-id') || '';
+                const produccionId = card?.getAttribute('data-produccion-id') || '';
+                const previewUrl = card?.getAttribute('data-preview-url') || '';
+
+                if (incluido && dialogo.trim()) {
+                    includedScenes.push({
+                        numero: Number(numero),
+                        titulo,
+                        dialogue: dialogo,
+                        incluido,
+                        item_id: itemId,
+                        produccion_id: produccionId,
+                        previewUrl
+                    });
+                }
+            });
+
+            if (includedScenes.length === 0) {
+                alert('No hay escenas incluidas con diálogo para generar el video.');
+                return;
+            }
+
+            const payload = {
+                produccion_id: document.querySelector('.edit-modal')?.dataset?.produccionId || '',
+                noticia_id: document.querySelector('.edit-modal')?.dataset?.noticiaId || '',
+                email_editor: document.getElementById('email')?.value?.trim() || '',
+                titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
+                descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
+                editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
+                formato: document.getElementById('formato')?.value?.trim() || 'historieta',
+                main_scene: document.getElementById('main_scene')?.value?.trim() || '',
+                imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
+                escenas: includedScenes,
+                submittedAt: new Date().toISOString(),
+                formMode: 'generate'
+            };
+
+
+            btnGenerateVideo.disabled = true;
+            btnGenerateVideo.innerHTML = '<span class="spinner"></span>Generando...';
+
+            try {
+                const response = await fetch(`${DOMAIN}/webhook/video`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message ?? errorData.mensaje ?? errorMessage;
+                    } catch {
+                        // Si no es JSON, usar el mensaje de status
+                    }
+                    mostrarErrorAlert(`Error al generar video: ${errorMessage}`);
+                } else {
+                    const result = await response.json();
+                    // Actualizar la URL del botón con el nuevo video
+                    const btnVerVideo = document.querySelector('.btn-ver-video');
+                    if (btnVerVideo && result.video_url) {
+                        btnVerVideo.setAttribute('data-video-url', result.video_url);
+                    }
+                    mostrarVideoSuccessModal(result.message ?? result.mensaje ?? 'Video generado con éxito');
+                }
+            } catch (error) {
+                mostrarErrorAlert(`Error de conexión: ${error.message}`);
+            } finally {
+                btnGenerateVideo.disabled = false;
+                btnGenerateVideo.innerHTML = 'Regenerar video';
+            }
+        });
+    }
     
     document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {
         el.addEventListener('input', function () {
@@ -302,6 +539,44 @@ function openEditModal(data) {
                 }
             }
         });
+    });
+}
+
+function mostrarVideoSuccessModal(message) {
+    const existing = document.querySelector('.video-success-overlay');
+    if (existing) existing.remove();
+    
+    const html = `
+        <div class="video-success-overlay">
+            <div class="video-success-modal">
+                <div class="video-success-icon">✅</div>
+                <h3>Video Regenerado</h3>
+                <p>${escaparHTML(message)}</p>
+                <button class="btn-video-success-close">Cerrar</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    const overlay = document.querySelector('.video-success-overlay');
+    const closeBtn = overlay.querySelector('.btn-video-success-close');
+    
+    function cerrarModal() {
+        overlay.remove();
+    }
+    
+    closeBtn.addEventListener('click', cerrarModal);
+    
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) cerrarModal();
+    });
+    
+    document.addEventListener('keydown', function handler(e) {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handler);
+        }
     });
 }
 
@@ -351,6 +626,59 @@ function showAbandonModalDesdeX() {
     overlay.addEventListener('click', function (e) {
         if (e.target === overlay) {
             overlay.remove();
+        }
+    });
+}
+
+async function mostrarRegenerarSuccessModal(message) {
+    const existing = document.querySelector('.regenerar-scene-success-overlay');
+    if (existing) existing.remove();
+    
+    const html = `
+        <div class="regenerar-scene-success-overlay">
+            <div class="regenerar-scene-success-modal">
+                <div class="regenerar-scene-success-icon">✅</div>
+                <h3>Escena Regenerada</h3>
+                <p>${escaparHTML(message)}</p>
+                <button class="btn-regenerar-success-close">Cerrar</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    const overlay = document.querySelector('.regenerar-scene-success-overlay');
+    const closeBtn = overlay.querySelector('.btn-regenerar-success-close');
+    
+    async function cerrarModal() {
+        overlay.remove();
+        
+        const produccionId = document.querySelector('.edit-modal')?.dataset?.produccionId;
+        if (produccionId) {
+            try {
+                const response = await fetch(`${DOMAIN}/webhook/get-edit?production_id=${encodeURIComponent(produccionId)}`);
+                if (response.ok) {
+                    const scenesData = await response.json();
+                    if (Array.isArray(scenesData) && scenesData.length > 0) {
+                        actualizarEscenasUI(scenesData);
+                    }
+                }
+            } catch (fetchError) {
+                console.warn('Error al llamar get-edit:', fetchError.message);
+            }
+        }
+    }
+    
+    closeBtn.addEventListener('click', cerrarModal);
+    
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) cerrarModal();
+    });
+    
+    document.addEventListener('keydown', function handler(e) {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handler);
         }
     });
 }

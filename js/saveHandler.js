@@ -49,29 +49,32 @@ function actualizarEscenasUI(scenesData) {
         if (checkbox) {
             checkbox.checked = scene.incluido ?? false;
         }
-
-        // Lock card if max editions reached
-        const puedeEditar = (Number(scene.ediciones ?? 0) < 3);
-        if (!puedeEditar && !card.classList.contains('locked')) {
-            card.classList.add('locked');
-            const dialogueField = card.querySelector('.scene-dialogue-field');
-            if (dialogueField) {
-                const lockedBox = document.createElement('div');
-                lockedBox.className = 'locked-dialogue-box';
-                lockedBox.innerHTML = `
-                    <p class="locked-dialogue-text">${escaparHTML(scene.dialogue ?? '')}</p>
-                    <div class="locked-warning">🔒 Límite de ediciones alcanzado</div>
-                `;
-                dialogueField.replaceWith(lockedBox);
-            }
-        }
     });
 }
 
 async function saveChanges() {
-    const sceneCards = document.querySelectorAll('.scene-card');
-    const sceneData = [];
+    // Validar campos de Configuración de Producción
+    const tituloVideo = document.getElementById('titulo_video')?.value?.trim() || '';
+    const descripcionVideo = document.getElementById('descripcion_video')?.value?.trim() || '';
+    const editorResponsable = document.getElementById('editor_responsable')?.value?.trim() || '';
+    const mainSceneInput = document.getElementById('main_scene');
+    const mainScene = mainSceneInput?.value?.trim() || '';
 
+    const emptyConfig = [];
+    if (!tituloVideo) emptyConfig.push('Título del video');
+    if (!descripcionVideo) emptyConfig.push('Descripción del video');
+    if (!editorResponsable) emptyConfig.push('Editor responsable');
+    if (mainSceneInput && !mainScene) emptyConfig.push('Prompt maestro');
+
+    if (emptyConfig.length > 0) {
+        alert(`Campos vacíos en Configuración de Producción:\n\n${emptyConfig.join('\n')}`);
+        return;
+    }
+
+    // Validar escenas
+    const sceneCards = document.querySelectorAll('.scene-card');
+    const emptyScenes = [];
+    const invalidScenes = [];
     sceneCards.forEach(card => {
         const checkbox = card.querySelector('.scene-checkbox');
         const numero = checkbox?.dataset.numero;
@@ -79,13 +82,17 @@ async function saveChanges() {
         const lockedDialogueText = card.querySelector('.locked-dialogue-text');
         const dialogo = textarea?.value ?? (lockedDialogueText?.textContent ?? '');
         const words = String(dialogo).split(/\s+/).filter(Boolean).length;
-
-        if (words > 0) {
-            sceneData.push({ numero, words });
+        if (words === 0) {
+            emptyScenes.push(numero);
+        } else if (words < 5 || words > 16) {
+            invalidScenes.push({ numero, words });
         }
     });
 
-    const invalidScenes = sceneData.filter(s => s.words < 5 || s.words > 16);
+    if (emptyScenes.length > 0) {
+        alert(`Campos vacíos en las escenas: ${emptyScenes.join(', ')}.`);
+        return;
+    }
 
     if (invalidScenes.length > 0) {
         const messages = invalidScenes.map(s =>
@@ -101,6 +108,32 @@ async function saveChanges() {
 
     const data = getFormData();
     console.log('Payload enviado:', JSON.stringify(data, null, 2));
+
+    // Verificar si hubo cambios reales desde que se abrió el modal
+    if (!hayCambiosDetectados()) {
+        const mensaje = 'No se detectaron cambios en los campos. No es necesario guardar.';
+        console.log('Sin cambios detectados:', mensaje);
+        const summaryHTML = `
+            <div class="save-alert-overlay">
+                <div class="save-alert">
+                    <div class="save-alert-icon">ℹ️</div>
+                    <h3>Sin cambios</h3>
+                    <p>${escaparHTML(mensaje)}</p>
+                    <button class="btn-save-alert-close">Cerrar</button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', summaryHTML);
+        const overlay = document.querySelector('.save-alert-overlay');
+        const closeBtn = overlay?.querySelector('.btn-save-alert-close');
+        closeBtn?.addEventListener('click', () => overlay?.remove());
+        overlay?.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+        btn.disabled = false;
+        btn.textContent = 'Guardar cambios';
+        return;
+    }
 
     try {
         const response = await fetch(`${DOMAIN}/webhook/save-edits`, {

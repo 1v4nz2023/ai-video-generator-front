@@ -325,3 +325,90 @@
     border-radius: var(--radius-md);
     background: var(--color-gray-100);
 }
+
+/* ===== Main Video Preview Modal ===== */
+.main-video-preview-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: var(--spacing-lg);
+}
+
+.main-video-preview-modal {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.main-video-preview-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--color-border-light);
+    flex-shrink: 0;
+}
+
+.main-video-preview-modal-header h3 {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--color-text-dark);
+    flex: 1;
+    margin-right: var(--spacing-lg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.main-video-preview-modal-close {
+    background: none;
+    border: none;
+    font-size: var(--font-size-2xl);
+    color: var(--color-text-light);
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    line-height: 1;
+    transition: color var(--transition-fast);
+    flex-shrink: 0;
+    width: auto;
+    min-width: unset;
+}
+
+.main-video-preview-modal-close:hover {
+    color: var(--color-text-dark);
+}
+
+.main-video-preview-modal-body {
+    padding: var(--spacing-xl);
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 0;
+}
+
+.main-video-preview-modal-body > * {
+    width: 100%;
+    max-width: 100%;
+}
+
+.main-video-preview-modal-video {
+    border-radius: var(--radius-md);
+    background: var(--color-gray-100);
+}

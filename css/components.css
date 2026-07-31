@@ -71,6 +71,57 @@ button:disabled {
     box-shadow: none;
 }
 
+/* ===== Generate Video Button ===== */
+.btn-generate-video {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: none;
+    border-radius: var(--radius-lg);
+    background: #3b82f6;
+    color: #ffffff;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-generate-video:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-button);
+}
+
+.btn-generate-video:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ===== Scenes Toolbar ===== */
+.scenes-toolbar {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.btn-select-all {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: 1px solid var(--color-primary-light);
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+    color: var(--color-primary-dark);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    width: auto;
+}
+
+.btn-select-all:hover {
+    background: var(--color-primary-light);
+    color: var(--color-white);
+}
+
 /* ===== Close Button (Edit Modal) ===== */
 .edit-modal-close,
 #btnCloseEditModal {

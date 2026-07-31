@@ -1,4 +1,49 @@
 let hasUnsavedChanges = false;
+let initialFormValues = {};
+
+function capturarValoresIniciales() {
+    initialFormValues = {
+        nota: document.getElementById('noteUrl')?.value || '',
+        email: document.getElementById('email')?.value || '',
+        titulo_video: document.getElementById('titulo_video')?.value || '',
+        descripcion_video: document.getElementById('descripcion_video')?.value || '',
+        editor_responsable: document.getElementById('editor_responsable')?.value || '',
+        main_scene: document.getElementById('main_scene')?.value || '',
+        imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value || '',
+        formato: document.getElementById('formato')?.value || 'historieta'
+    };
+    // Capturar diálogos de escenas
+    document.querySelectorAll('.scene-card').forEach(card => {
+        const numero = card.querySelector('.scene-checkbox')?.dataset.numero;
+        if (numero) {
+            const fieldName = `dialogo_escena_${numero}`;
+            const textarea = document.getElementById(fieldName);
+            if (textarea) {
+                initialFormValues[fieldName] = textarea.value;
+            }
+            const includedField = `incluido_escena_${numero}`;
+            const checkbox = document.getElementById(includedField);
+            if (checkbox) {
+                initialFormValues[includedField] = checkbox.checked;
+            }
+        }
+    });
+}
+
+function hayCambiosDetectados() {
+    const camposEditables = Object.keys(initialFormValues);
+    for (const campo of camposEditables) {
+        const el = document.getElementById(campo);
+        if (el) {
+            if (el.type === 'checkbox') {
+                if (el.checked !== initialFormValues[campo]) return true;
+            } else {
+                if (el.value !== initialFormValues[campo]) return true;
+            }
+        }
+    }
+    return false;
+}
 
 window.addEventListener('beforeunload', function (e) {
     if (hasUnsavedChanges) {

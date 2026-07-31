@@ -7,6 +7,7 @@ function getFormData() {
         titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
         descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
         editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
+        formato: document.getElementById('formato')?.value?.trim() || 'historieta',
         main_scene: document.getElementById('main_scene')?.value?.trim() || '',
         imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
         submittedAt: new Date().toISOString(),
