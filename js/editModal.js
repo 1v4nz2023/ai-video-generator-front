@@ -50,6 +50,242 @@ function verVideoPrincipal() {
     });
 }
 
+// MODAL BLOQUEANTE: representa un job en curso ("diálogos de video en proceso").
+// A propósito NO tiene botón de cierre, ni click-afuera, ni tecla Escape.
+// Solo debe removerse programáticamente desde el código que controla el flujo
+// (ej: document.querySelector('.generando-video-overlay')?.remove()).
+function mostrarGenerandoVideoModal(message) {
+    const existing = document.querySelector('.generando-video-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="generando-video-overlay">
+            <div class="generando-video-modal">
+                <div class="generando-video-icon">🎬</div>
+                <h3>Diálogos de video en Proceso</h3>
+                <p>${escaparHTML(message)}</p>
+                <div class="generando-video-spinner"><span class="spinner"></span></div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// MODAL BLOQUEANTE: informa que ya hay un job corriendo para esta nota.
+// Se cierra solo cuando el polling en formHandler.js detecta un estado final
+// (completed/done/failed/error) o cuando aparece el HTML del Second Brain.
+function mostrarJobEnCursoModal(message) {
+    const existing = document.querySelector('.job-en-curso-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="job-en-curso-overlay">
+            <div class="job-en-curso-modal">
+                <div class="job-en-curso-icon">⏳</div>
+                <h3>Job en Curso</h3>
+                <p>${escaparHTML(message)}</p>
+                <div class="job-en-curso-spinner"><span class="spinner"></span></div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// MODAL BLOQUEANTE: el usuario debe elegir un formato sí o sí (sin click-afuera,
+// sin Escape). jobId viaja como parámetro explícito (fuente confiable) en vez de
+// depender de localStorage, que puede haber sido limpiado antes de que el
+// usuario confirme su elección.
+function mostrarRecomendacionFormatoModal(htmlContent, email, noteUrl, noticiaId = null, jobId = null) {
+    const existing = document.querySelector('.recomendacion-formato-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="recomendacion-formato-overlay">
+            <div class="recomendacion-formato-modal">
+                <div class="recomendacion-formato-icon">🧠</div>
+                <h3>Recomendación del Second Brain</h3>
+                <div class="recomendacion-formato-content">${htmlContent}</div>
+                <div class="recomendacion-formato-form">
+                    <label for="formato-select">Selecciona el formato:</label>
+                    <select id="formato-select">
+                        <option value="video">video</option>
+                        <option value="historieta">historieta</option>
+                    </select>
+                    <button class="btn-recomendacion-confirm">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const overlay = document.querySelector('.recomendacion-formato-overlay');
+    const confirmBtn = overlay.querySelector('.btn-recomendacion-confirm');
+    const select = overlay.querySelector('#formato-select');
+
+    function cerrarModal() {
+        overlay.remove();
+    }
+
+    confirmBtn.addEventListener('click', async function () {
+        const formatoSeleccionado = select.value;
+        cerrarModal();
+
+        // Mostrar modal bloqueante "Diálogos de video en Proceso"
+        mostrarGenerandoVideoModal('Procesando formato seleccionado...');
+
+        try {
+            // jobId viene por parámetro (fuente confiable); localStorage solo como respaldo
+            const jobIdFinal = jobId || localStorage.getItem('videoJobId');
+            if (!jobIdFinal) {
+                console.warn('⚠️ jobId no encontrado, no se puede continuar');
+                document.querySelector('.generando-video-overlay')?.remove();
+                window.resetSubmitBtn?.();
+                return;
+            }
+
+            const payload = { formato: formatoSeleccionado, email, nota: noteUrl, jobId: jobIdFinal };
+            if (noticiaId) {
+                payload.noticia_id = noticiaId;
+            }
+
+            // 1. Enviar formato seleccionado
+            const formatoResponse = await fetch(`${DOMAIN}/webhook/formato`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!formatoResponse.ok) {
+                console.warn('⚠️ Error al enviar formato');
+                document.querySelector('.generando-video-overlay')?.remove();
+                window.resetSubmitBtn?.();
+                return;
+            }
+
+            console.log(`✅ Formato "${formatoSeleccionado}" enviado correctamente`);
+
+            // 2. Polling a /webhook/estado hasta detectar estado === 'escenas-creadas'
+            const pollingInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${DOMAIN}/webhook/estado?jobId=${encodeURIComponent(jobIdFinal)}`);
+                    if (response.ok) {
+                        const rawData = await response.json();
+                        const statusData = Array.isArray(rawData) ? (rawData.length > 0 ? rawData[0] : null) : rawData;
+
+                        if (statusData && statusData.estado === 'escenas-creadas') {
+                            clearInterval(pollingInterval);
+                            // 3. Cerrar modal "Diálogos de video en Proceso"
+                            document.querySelector('.generando-video-overlay')?.remove();
+                            console.log('✅ Estado "escenas-creadas" detectado');
+
+                            // 4. Liberar el botón "Iniciar proceso" del form: el ciclo terminó
+                            window.resetSubmitBtn?.();
+
+                            // 5. Mostrar aviso para entrar al editor
+                            mostrarEscenasCreadasModal(email, noteUrl);
+                        }
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Error en polling tras formato:', error.message);
+                }
+            }, 5000);
+        } catch (error) {
+            console.warn('⚠️ Error de red al enviar formato:', error.message);
+            document.querySelector('.generando-video-overlay')?.remove();
+            window.resetSubmitBtn?.();
+        }
+    });
+
+    // A propósito NO hay listener de click-afuera ni de Escape en este modal:
+    // el usuario debe confirmar un formato para continuar.
+}
+
+// MODAL de confirmación (no bloqueante): las escenas ya fueron creadas.
+// Ofrece entrar directo al editor volviendo a pedir los datos a /webhook/edit
+// y reutilizando la misma transformación que usa el flujo inicial.
+function mostrarEscenasCreadasModal(email, noteUrl) {
+    const existing = document.querySelector('.escenas-creadas-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="escenas-creadas-overlay">
+            <div class="escenas-creadas-modal">
+                <div class="escenas-creadas-icon">✅</div>
+                <h3>Escenas creadas</h3>
+                <p>Las escenas del video han sido creadas. Puedes entrar al editor para generar el video.</p>
+                <button class="btn-escenas-creadas-editor">✏️ Entrar al editor</button>
+                <button class="btn-escenas-creadas-cerrar">Cerrar</button>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    const overlay = document.querySelector('.escenas-creadas-overlay');
+    const editorBtn = overlay.querySelector('.btn-escenas-creadas-editor');
+    const cerrarBtn = overlay.querySelector('.btn-escenas-creadas-cerrar');
+
+    function cerrarModal() {
+        overlay.remove();
+    }
+
+    cerrarBtn.addEventListener('click', cerrarModal);
+
+    editorBtn.addEventListener('click', async function () {
+        editorBtn.disabled = true;
+        editorBtn.innerHTML = '<span class="spinner"></span>Cargando...';
+
+        try {
+            const response = await fetch(`${DOMAIN}/webhook/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, nota: noteUrl })
+            });
+
+            if (!response.ok) {
+                console.warn('⚠️ Error al obtener datos para el editor');
+                editorBtn.disabled = false;
+                editorBtn.innerHTML = '✏️ Entrar al editor';
+                return;
+            }
+
+            const data = await response.json();
+            let responseData = Array.isArray(data) ? data[0] : data;
+            if (Array.isArray(responseData)) {
+                responseData = responseData[0];
+            }
+
+            if (!responseData || typeof responseData !== 'object' || !Array.isArray(responseData.escenas)) {
+                console.warn('⚠️ Datos inválidos para abrir el editor');
+                editorBtn.disabled = false;
+                editorBtn.innerHTML = '✏️ Entrar al editor';
+                return;
+            }
+
+            const transformed = window.transformarDatosNoticia(responseData);
+            cerrarModal();
+            openEditModal(transformed);
+        } catch (error) {
+            console.warn('⚠️ Error de red al cargar el editor:', error.message);
+            editorBtn.disabled = false;
+            editorBtn.innerHTML = '✏️ Entrar al editor';
+        }
+    });
+
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) cerrarModal();
+    });
+    document.addEventListener('keydown', function handler(e) {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handler);
+        }
+    });
+}
+
 function buildEditForm(data) {
     const {
         formato, es_video, etiqueta_contenido, 
@@ -420,7 +656,7 @@ function openEditModal(data) {
 
     const btnGenerateVideo = document.getElementById('btnGenerateVideo');
     if (btnGenerateVideo) {
-        btnGenerateVideo.addEventListener('click', async function () {
+        btnGenerateVideo.addEventListener('click', function () {
             const sceneCards = document.querySelectorAll('.scene-card');
             const includedScenes = [];
 
@@ -454,57 +690,111 @@ function openEditModal(data) {
                 return;
             }
 
-            const payload = {
-                produccion_id: document.querySelector('.edit-modal')?.dataset?.produccionId || '',
-                noticia_id: document.querySelector('.edit-modal')?.dataset?.noticiaId || '',
-                email_editor: document.getElementById('email')?.value?.trim() || '',
-                titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
-                descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
-                editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
-                formato: document.getElementById('formato')?.value?.trim() || 'historieta',
-                main_scene: document.getElementById('main_scene')?.value?.trim() || '',
-                imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
-                escenas: includedScenes,
-                submittedAt: new Date().toISOString(),
-                formMode: 'generate'
-            };
+            mostrarConfirmacionRegenerarModal(includedScenes);
+        });
+    }
 
+    function mostrarConfirmacionRegenerarModal(includedScenes) {
+        const existing = document.querySelector('.confirm-regenerate-overlay');
+        if (existing) existing.remove();
 
-            btnGenerateVideo.disabled = true;
-            btnGenerateVideo.innerHTML = '<span class="spinner"></span>Generando...';
+        const html = `
+            <div class="confirm-regenerate-overlay">
+                <div class="confirm-regenerate-modal">
+                    <div class="confirm-regenerate-icon">⚠️</div>
+                    <h3>Confirmar Regeneración de Video</h3>
+                    <p>Se regenerará el video con las escenas incluidas. ¿Deseas continuar?</p>
+                    <div class="confirm-regenerate-actions">
+                        <button class="btn-confirm-regenerate-yes">Sí, regenerar</button>
+                        <button class="btn-confirm-regenerate-no">No, cancelar</button>
+                    </div>
+                </div>
+            </div>
+        `;
 
-            try {
-                const response = await fetch(`${DOMAIN}/webhook/video`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+        document.body.insertAdjacentHTML('beforeend', html);
 
-                if (!response.ok) {
-                    let errorMessage = `Error ${response.status}: ${response.statusText}`;
-                    try {
-                        const errorData = await response.json();
-                        errorMessage = errorData.message ?? errorData.mensaje ?? errorMessage;
-                    } catch {
-                        // Si no es JSON, usar el mensaje de status
-                    }
-                    mostrarErrorAlert(`Error al generar video: ${errorMessage}`);
-                } else {
-                    const result = await response.json();
-                    // Actualizar la URL del botón con el nuevo video
-                    const btnVerVideo = document.querySelector('.btn-ver-video');
-                    if (btnVerVideo && result.video_url) {
-                        btnVerVideo.setAttribute('data-video-url', result.video_url);
-                    }
-                    mostrarVideoSuccessModal(result.message ?? result.mensaje ?? 'Video generado con éxito');
-                }
-            } catch (error) {
-                mostrarErrorAlert(`Error de conexión: ${error.message}`);
-            } finally {
-                btnGenerateVideo.disabled = false;
-                btnGenerateVideo.innerHTML = 'Regenerar video';
+        const overlay = document.querySelector('.confirm-regenerate-overlay');
+        const yesBtn = overlay.querySelector('.btn-confirm-regenerate-yes');
+        const noBtn = overlay.querySelector('.btn-confirm-regenerate-no');
+
+        function cerrarModal() {
+            overlay.remove();
+        }
+
+        noBtn.addEventListener('click', function () {
+            cerrarModal();
+        });
+
+        yesBtn.addEventListener('click', async function () {
+            cerrarModal();
+            await generarVideo(includedScenes);
+        });
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) cerrarModal();
+        });
+
+        document.addEventListener('keydown', function handler(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+                document.removeEventListener('keydown', handler);
             }
         });
+    }
+
+    async function generarVideo(includedScenes) {
+        const btnGenerateVideo = document.getElementById('btnGenerateVideo');
+
+        const payload = {
+            produccion_id: document.querySelector('.edit-modal')?.dataset?.produccionId || '',
+            noticia_id: document.querySelector('.edit-modal')?.dataset?.noticiaId || '',
+            email_editor: document.getElementById('email')?.value?.trim() || '',
+            titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
+            descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
+            editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
+            formato: document.getElementById('formato')?.value?.trim() || 'historieta',
+            main_scene: document.getElementById('main_scene')?.value?.trim() || '',
+            imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
+            escenas: includedScenes,
+            submittedAt: new Date().toISOString(),
+            formMode: 'generate'
+        };
+
+        btnGenerateVideo.disabled = true;
+        btnGenerateVideo.innerHTML = '<span class="spinner"></span>Generando...';
+
+        try {
+            const response = await fetch(`${DOMAIN}/webhook/video`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message ?? errorData.mensaje ?? errorMessage;
+                } catch {
+                    // Si no es JSON, usar el mensaje de status
+                }
+                mostrarErrorAlert(`Error al generar video: ${errorMessage}`);
+            } else {
+                const result = await response.json();
+                // Actualizar la URL del botón con el nuevo video
+                const btnVerVideo = document.querySelector('.btn-ver-video');
+                if (btnVerVideo && result.video_url) {
+                    btnVerVideo.setAttribute('data-video-url', result.video_url);
+                }
+                mostrarVideoSuccessModal(result.message ?? result.mensaje ?? 'Video generado con éxito');
+            }
+        } catch (error) {
+            mostrarErrorAlert(`Error de conexión: ${error.message}`);
+        } finally {
+            btnGenerateVideo.disabled = false;
+            btnGenerateVideo.innerHTML = 'Regenerar video';
+        }
     }
     
     document.querySelectorAll('input[type="text"], textarea, select').forEach(el => {

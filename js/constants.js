@@ -1,1 +1,1 @@
-const DOMAIN = 'https://devevents.elcomercio.pe';
+const DOMAIN = 'https://events.elcomercio.pe';
