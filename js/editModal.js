@@ -75,6 +75,28 @@ function mostrarGenerandoVideoModal(message) {
 // MODAL BLOQUEANTE: informa que ya hay un job corriendo para esta nota.
 // Se cierra solo cuando el polling en formHandler.js detecta un estado final
 // (completed/done/failed/error) o cuando aparece el HTML del Second Brain.
+// MODAL BLOQUEANTE: la escena entró en cola de generación (ej: respuesta de
+// /webhook/regenerate-scene con "Generación de escena en proceso"). Sin botón
+// de cierre, sin click-afuera, sin Escape. Solo se remueve programáticamente
+// desde pollEscenaRegenerada() cuando el polling a /webhook/escena resuelve.
+function mostrarGenerandoEscenaModal(message) {
+    const existing = document.querySelector('.generando-escena-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="generando-escena-overlay">
+            <div class="generando-escena-modal">
+                <div class="generando-escena-icon">🎬</div>
+                <h3>Generación de Escena en Proceso</h3>
+                <p>${escaparHTML(message)}</p>
+                <div class="generando-escena-spinner"><span class="spinner"></span></div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
 function mostrarJobEnCursoModal(message) {
     const existing = document.querySelector('.job-en-curso-overlay');
     if (existing) existing.remove();
@@ -624,6 +646,9 @@ function openEditModal(data) {
                 // Verificar si el response es un array con ok: false
                 if (Array.isArray(result) && result.length > 0 && result[0].ok === false) {
                     mostrarErrorAlert(result[0].message ?? 'Error al regenerar escena');
+                    this.disabled = false;
+                    this.innerHTML = '🔄 Regenerar Escena con IA';
+                    return;
                 } else if (!response.ok) {
                     let errorMessage = `Error ${response.status}: ${response.statusText}`;
                     try {
@@ -632,12 +657,21 @@ function openEditModal(data) {
                         // Si no es JSON, usar el mensaje de status
                     }
                     mostrarErrorAlert(`Error al regenerar escena: ${errorMessage}`);
-                } else {
-                    mostrarRegenerarSuccessModal(result.message ?? result.mensaje ?? 'Escena regenerada con éxito');
+                    this.disabled = false;
+                    this.innerHTML = '🔄 Regenerar Escena con IA';
+                    return;
                 }
+
+                // El POST inicial fue aceptado: el backend puso la escena en cola de
+                // generación (ej: {"message":"Generación de escena en proceso"}).
+                // Mostramos ese mensaje en un modal bloqueante (sin botón "Entendido")
+                // y arrancamos el polling a /webhook/escena hasta que preview_url
+                // deje de ser null.
+                mostrarGenerandoEscenaModal(result.message ?? result.mensaje ?? 'Generación de escena en proceso');
+                await pollEscenaRegenerada(itemId, this);
+
             } catch (error) {
                 mostrarErrorAlert(`Error de conexión: ${error.message}`);
-            } finally {
                 this.disabled = false;
                 this.innerHTML = '🔄 Regenerar Escena con IA';
             }
@@ -832,6 +866,74 @@ function openEditModal(data) {
     });
 }
 
+// Hace polling GET a /webhook/escena?item_id=... hasta que preview_url deje de
+// ser null. Si preview_url trae el mensaje de error del unidor de videos,
+// muestra un modal de error con ese mensaje. Si no, muestra el modal de éxito
+// (que a su vez dispara la actualización vía get-edit al cerrarse).
+// Devuelve una Promise que resuelve cuando termina el polling, para que el
+// botón que lo disparó pueda re-habilitarse en el momento correcto.
+function pollEscenaRegenerada(itemId, btn) {
+    // Cualquiera de estos textos dentro de preview_url indica que el video
+    // NO se generó correctamente (agregar más frases aquí si aparecen nuevos casos)
+    const ERROR_MARCADORES = [
+        'Problemas con el unidor de videos',
+        'Problemas con Veo 3.1',
+        'Error en la generación del video debido al servicio que fusiona escenas'
+    ];
+
+    return new Promise((resolve) => {
+        const intervalId = setInterval(async () => {
+            try {
+                const response = await fetch(`https://events.elcomercio.pe/webhook/escena?item_id=${encodeURIComponent(itemId)}`);
+                if (!response.ok) {
+                    console.warn('⚠️ /webhook/escena respondió con error, se reintenta en el próximo tick');
+                    return;
+                }
+
+                const rawData = await response.json();
+                const data = Array.isArray(rawData) ? (rawData.length > 0 ? rawData[0] : null) : rawData;
+
+                if (!data || data.preview_url === null || data.preview_url === undefined) {
+                    // Todavía no está lista, seguimos esperando
+                    return;
+                }
+
+                clearInterval(intervalId);
+
+                // Cerrar el modal bloqueante "Generación de Escena en Proceso"
+                document.querySelector('.generando-escena-overlay')?.remove();
+
+                if (typeof data.preview_url === 'string' && ERROR_MARCADORES.some(marcador => data.preview_url.includes(marcador))) {
+                    // El video no se generó: mostrar el detalle tal cual viene en preview_url
+                    mostrarErrorAlert(data.preview_url);
+                } else {
+                    // Actualizar data-preview-url DE INMEDIATO con el valor recién confirmado
+                    // por /webhook/escena — mismo patrón que "Ver Video Principal", que actualiza
+                    // su atributo apenas llega la respuesta, sin depender de un fetch posterior
+                    // (el get-edit que dispara el modal de éxito al cerrarse queda solo como
+                    // refresco secundario para ediciones/bloqueo, no como única fuente de la URL).
+                    const sceneCard = document.querySelector(`.scene-card[data-item-id="${CSS.escape(String(itemId))}"]`);
+                    if (sceneCard) {
+                        sceneCard.setAttribute('data-preview-url', data.preview_url);
+                    }
+
+                    // Escena regenerada con éxito: el modal de éxito llama a get-edit al cerrarse
+                    mostrarRegenerarSuccessModal('Escena regenerada con éxito');
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Regenerar Escena con IA';
+                }
+                resolve();
+            } catch (error) {
+                console.warn('⚠️ Error en polling de /webhook/escena:', error.message);
+                // seguimos intentando en el siguiente tick
+            }
+        }, 5000);
+    });
+}
+
 function mostrarVideoSuccessModal(message) {
     const existing = document.querySelector('.video-success-overlay');
     if (existing) existing.remove();
@@ -916,6 +1018,102 @@ function showAbandonModalDesdeX() {
     overlay.addEventListener('click', function (e) {
         if (e.target === overlay) {
             overlay.remove();
+        }
+    });
+}
+
+// Actualiza en el DOM la escena que acaba de regenerarse, con los datos frescos
+// que devuelve /webhook/get-edit — sin necesidad de recargar todo el modal.
+// Acepta tanto un array de escenas "planas" como el shape anidado
+// [{ escenas: [...] }] (mismo formato que devuelve /webhook/edit).
+function actualizarEscenasUI(scenesData) {
+    let escenas = null;
+
+    if (Array.isArray(scenesData) && scenesData.length > 0) {
+        const primero = scenesData[0];
+        if (Array.isArray(primero?.escenas)) {
+            escenas = primero.escenas;
+        } else if (primero && (primero.item_id !== undefined || primero.numero !== undefined)) {
+            escenas = scenesData;
+        }
+    }
+
+    if (!Array.isArray(escenas)) {
+        console.warn('⚠️ actualizarEscenasUI: formato de datos no reconocido, no se actualizó la UI');
+        return;
+    }
+
+    escenas.forEach(esc => {
+        const itemId = esc.item_id;
+        const numero = esc.numero;
+        const previewUrl = esc.preview_url ?? esc.previewUrl ?? '';
+        const ediciones = esc.ediciones ?? 0;
+
+        // Ubicar la scene-card correspondiente por item_id (o por id compuesto de respaldo)
+        let sceneCard = null;
+        if (itemId !== undefined && itemId !== null && itemId !== '') {
+            sceneCard = document.querySelector(`.scene-card[data-item-id="${CSS.escape(String(itemId))}"]`);
+        }
+        if (!sceneCard) {
+            sceneCard = document.getElementById(`scene-${itemId || numero}`);
+        }
+        if (!sceneCard) return;
+
+        // 1. Actualizar la URL que usa "Ver Preview" para que muestre el video recién generado
+        sceneCard.setAttribute('data-preview-url', previewUrl || '');
+
+        // 2. Actualizar el contador de ediciones (badge y botón de regenerar)
+        const badge = sceneCard.querySelector('.edition-badge');
+        if (badge) badge.textContent = `Ediciones: ${ediciones} / 3`;
+
+        const btnRegenerate = sceneCard.querySelector('.btn-scene-regenerate');
+        const maxEdits = 3;
+        const dialogueTexto = esc.dialogue ?? esc.dialogo ?? '';
+
+        if (Number(ediciones) >= maxEdits) {
+            if (btnRegenerate) {
+                btnRegenerate.setAttribute('data-ediciones', ediciones);
+                btnRegenerate.disabled = true;
+            }
+
+            // Si la escena todavía tiene el textarea editable, reemplazarlo por el
+            // bloque bloqueado (mismo HTML que buildEditForm usa cuando puedeEditar es false)
+            const dialogueField = sceneCard.querySelector('.scene-dialogue-field');
+            if (dialogueField) {
+                dialogueField.outerHTML = `
+                    <div class="locked-dialogue-box">
+                        <p class="locked-dialogue-text">${escaparHTML(dialogueTexto)}</p>
+                        <div class="locked-warning">
+                            🔒 Límite de ediciones alcanzado
+                        </div>
+                    </div>`;
+            } else {
+                // Ya estaba bloqueada: solo refrescar el texto por si cambió
+                const lockedText = sceneCard.querySelector('.locked-dialogue-text');
+                if (lockedText) lockedText.textContent = dialogueTexto;
+            }
+        } else {
+            if (btnRegenerate) {
+                btnRegenerate.setAttribute('data-ediciones', ediciones);
+                btnRegenerate.disabled = false;
+            }
+
+            // Sigue editable: refrescar el valor del textarea y su contador de palabras
+            // por si el backend devolvió el diálogo con algún ajuste (trim, etc.)
+            const textarea = sceneCard.querySelector('.scene-dialogue-textarea');
+            if (textarea) {
+                textarea.value = dialogueTexto;
+                const numeroCounter = textarea.dataset.numero;
+                const counter = sceneCard.querySelector(`.word-counter[data-numero="${numeroCounter}"]`);
+                if (counter) {
+                    const words = String(dialogueTexto).split(/\s+/).filter(Boolean).length;
+                    const max = 16;
+                    counter.textContent = `${words} / ${max} palabras`;
+                    counter.classList.remove('warning', 'error');
+                    if (words > max) counter.classList.add('error');
+                    else if (words >= 13) counter.classList.add('warning');
+                }
+            }
         }
     });
 }

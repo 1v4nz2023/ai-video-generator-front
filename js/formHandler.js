@@ -264,8 +264,16 @@ async function iniciarProceso(email, noteUrl, formatoSeleccionado = null) {
         }
 
         if (recommendationData) {
-            // aquí sí puede venir de localStorage porque se acaba de setear en este mismo flujo
-            const jobIdActual = localStorage.getItem('videoJobId');
+            // El identificador de correlación del job es siempre noticia_id, tanto si el
+            // Second Brain llegó directo del /edit inicial como si vino tras el polling.
+            // localStorage queda solo como último respaldo, por si en algún caso no
+            // viniera en la respuesta.
+            const jobIdActual = recommendationData.noticia_id || localStorage.getItem('videoJobId');
+
+            if (!jobIdActual) {
+                console.warn('⚠️ El Second Brain llegó sin noticia_id, no se puede continuar con el flujo de formato.');
+            }
+
             submitBtn.disabled = true;
             submitBtn.textContent = '🧠 Elige un formato...';
             mostrarRecomendacionFormatoModal(recommendationData.html, email, noteUrl, recommendationData.noticia_id, jobIdActual);
