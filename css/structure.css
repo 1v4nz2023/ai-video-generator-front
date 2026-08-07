@@ -69,6 +69,7 @@
 
 /* ===== Footer Actions ===== */
 .footer-actions {
+    width: 100%;
     display: flex;
     gap: var(--spacing-md);
     align-items: center;

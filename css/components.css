@@ -89,6 +89,23 @@ button:disabled {
     box-shadow: var(--shadow-button);
 }
 
+.btn-generate-video-final {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: none;
+    border-radius: var(--radius-lg);
+    background: #245f0d;
+    color: #ffffff;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-generate-video-final:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-button);
+}
+
 .btn-generate-video:disabled {
     opacity: 0.5;
     cursor: not-allowed;

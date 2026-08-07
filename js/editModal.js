@@ -72,9 +72,6 @@ function mostrarGenerandoVideoModal(message) {
     document.body.insertAdjacentHTML('beforeend', html);
 }
 
-// MODAL BLOQUEANTE: informa que ya hay un job corriendo para esta nota.
-// Se cierra solo cuando el polling en formHandler.js detecta un estado final
-// (completed/done/failed/error) o cuando aparece el HTML del Second Brain.
 // MODAL BLOQUEANTE: la escena entró en cola de generación (ej: respuesta de
 // /webhook/regenerate-scene con "Generación de escena en proceso"). Sin botón
 // de cierre, sin click-afuera, sin Escape. Solo se remueve programáticamente
@@ -97,6 +94,32 @@ function mostrarGenerandoEscenaModal(message) {
     document.body.insertAdjacentHTML('beforeend', html);
 }
 
+// MODAL BLOQUEANTE: el video final entró en cola de generación (respuesta de
+// /webhook/generation confirmando que n8n inició el proceso). Sin botón de
+// cierre, sin click-afuera, sin Escape. Solo se remueve programáticamente
+// desde pollVideoGenerado() cuando el polling a /webhook/estado detecta
+// estado === 'generado' (o un estado de error).
+function mostrarGenerandoVideoFinalModal(message) {
+    const existing = document.querySelector('.generando-video-final-overlay');
+    if (existing) existing.remove();
+
+    const html = `
+        <div class="generando-video-final-overlay">
+            <div class="generando-video-final-modal">
+                <div class="generando-video-final-icon">🎬</div>
+                <h3>Generación de Video en Proceso</h3>
+                <p>${escaparHTML(message)}</p>
+                <div class="generando-video-final-spinner"><span class="spinner"></span></div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// MODAL BLOQUEANTE: informa que ya hay un job corriendo para esta nota.
+// Se cierra solo cuando el polling en formHandler.js detecta un estado final
+// (completed/done/failed/error) o cuando aparece el HTML del Second Brain.
 function mostrarJobEnCursoModal(message) {
     const existing = document.querySelector('.job-en-curso-overlay');
     if (existing) existing.remove();
@@ -456,11 +479,11 @@ function buildEditForm(data) {
                     ${formHTML}
                 </div>
                 <div class="edit-modal-footer">
-                    <p id="summary_included" class="summary-text"></p>
                     <div class="footer-actions">
                         <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
                         <button class="btn-save" id="btnSave">Guardar cambios</button>
-                        <button class="btn-generate-video" id="btnGenerateVideo">Regenerar video</button>
+                        <button class="btn-generate-video" id="btnGenerateVideo">Unir videos</button>
+                        <button class="btn-generate-video-final" id="btnGenerarVideoFinal">Generar Video</button>
                     </div>
                 </div>
             </div>
@@ -688,36 +711,82 @@ function openEditModal(data) {
 
     saveBtn.addEventListener('click', saveChanges);
 
+    // Recolecta las escenas incluidas (checkbox marcado + diálogo no vacío).
+    // Si excludeLocked es true (default), separa las escenas bloqueadas (3+ ediciones).
+    // Si excludeLocked es false, incluye TODAS las escenas (para /webhook/video).
+    function obtenerEscenasIncluidas(excludeLocked = true) {
+        const sceneCards = document.querySelectorAll('.scene-card');
+        const includedScenes = [];
+        const excludedScenes = [];
+
+        sceneCards.forEach(card => {
+            const isLocked = card.classList.contains('locked');
+            const checkbox = card.querySelector('.scene-checkbox');
+            const numero = checkbox?.dataset.numero;
+            const editionBadge = card.querySelector('.edition-badge');
+            const editionText = editionBadge?.textContent || '';
+            const ediciones = Number(editionText.match(/(\d+)/)?.[1] || 0);
+            const titulo = card?.getAttribute('data-titulo') || '';
+            const itemId = card?.getAttribute('data-item-id') || '';
+            const produccionId = card?.getAttribute('data-produccion-id') || '';
+            const previewUrl = card?.getAttribute('data-preview-url') || '';
+
+            if (isLocked && excludeLocked) {
+                const isChecked = checkbox?.checked ?? false;
+                if (isChecked) {
+                    excludedScenes.push({
+                        numero: Number(numero),
+                        titulo,
+                        ediciones
+                    });
+                }
+                return;
+            }
+
+            const textarea = card.querySelector('.scene-dialogue-textarea');
+            const dialogo = textarea?.value || '';
+            const incluido = checkbox?.checked ?? false;
+
+            // Si excludeLocked es false, incluir escenas bloqueadas marcadas incluso sin diálogo
+            if (isLocked && !excludeLocked && incluido) {
+                includedScenes.push({
+                    numero: Number(numero),
+                    titulo,
+                    dialogue: dialogo,
+                    incluido,
+                    item_id: itemId,
+                    produccion_id: produccionId,
+                    previewUrl,
+                    ediciones
+                });
+                return;
+            }
+
+            if (incluido && dialogo.trim()) {
+                includedScenes.push({
+                    numero: Number(numero),
+                    titulo,
+                    dialogue: dialogo,
+                    incluido,
+                    item_id: itemId,
+                    produccion_id: produccionId,
+                    previewUrl,
+                    ediciones
+                });
+            }
+        });
+
+        if (excludeLocked) {
+            return { includedScenes, excludedScenes };
+        }
+        return includedScenes;
+    }
+
     const btnGenerateVideo = document.getElementById('btnGenerateVideo');
     if (btnGenerateVideo) {
         btnGenerateVideo.addEventListener('click', function () {
-            const sceneCards = document.querySelectorAll('.scene-card');
-            const includedScenes = [];
-
-            sceneCards.forEach(card => {
-                const checkbox = card.querySelector('.scene-checkbox');
-                const numero = checkbox?.dataset.numero;
-                const textarea = card.querySelector('.scene-dialogue-textarea');
-                const lockedDialogueText = card.querySelector('.locked-dialogue-text');
-                const dialogo = textarea?.value ?? (lockedDialogueText?.textContent ?? '');
-                const incluido = checkbox?.checked ?? false;
-                const titulo = card?.getAttribute('data-titulo') || '';
-                const itemId = card?.getAttribute('data-item-id') || '';
-                const produccionId = card?.getAttribute('data-produccion-id') || '';
-                const previewUrl = card?.getAttribute('data-preview-url') || '';
-
-                if (incluido && dialogo.trim()) {
-                    includedScenes.push({
-                        numero: Number(numero),
-                        titulo,
-                        dialogue: dialogo,
-                        incluido,
-                        item_id: itemId,
-                        produccion_id: produccionId,
-                        previewUrl
-                    });
-                }
-            });
+            // /webhook/video NO aplica restricciones: envía TODAS las escenas incluidas
+            const includedScenes = obtenerEscenasIncluidas(false);
 
             if (includedScenes.length === 0) {
                 alert('No hay escenas incluidas con diálogo para generar el video.');
@@ -725,6 +794,35 @@ function openEditModal(data) {
             }
 
             mostrarConfirmacionRegenerarModal(includedScenes);
+        });
+    }
+
+    // Botón "Generar Video": envía el mismo payload que "Unir videos", pero al
+    // endpoint /webhook/generation. n8n confirma que el proceso inició, y desde
+    // ahí se hace polling a /webhook/estado hasta que estado === 'generado'
+    // (mismo patrón que pollEscenaRegenerada: modal bloqueante + polling con
+    // guards para evitar ticks solapados).
+    const btnGenerarVideoFinal = document.getElementById('btnGenerarVideoFinal');
+    if (btnGenerarVideoFinal) {
+        btnGenerarVideoFinal.addEventListener('click', function () {
+            const { includedScenes, excludedScenes } = obtenerEscenasIncluidas();
+
+            if (includedScenes.length === 0 && excludedScenes.length > 0) {
+                const sceneNames = excludedScenes.map(s => `Escena ${s.numero} - "${escaparHTML(s.titulo)}"`).join(', ');
+                alert(`Las escenas seleccionadas no pueden generarse porque han alcanzado el límite de 3 ediciones:\n\n${sceneNames}`);
+                return;
+            }
+
+            if (includedScenes.length === 0) {
+                alert('No hay escenas incluidas con diálogo para generar el video.');
+                return;
+            }
+
+            if (excludedScenes.length > 0) {
+                mostrarAdvertenciaEscenasBloqueadasModal(excludedScenes, includedScenes);
+            } else {
+                mostrarConfirmacionGenerarVideoFinalModal(includedScenes);
+            }
         });
     }
 
@@ -736,10 +834,10 @@ function openEditModal(data) {
             <div class="confirm-regenerate-overlay">
                 <div class="confirm-regenerate-modal">
                     <div class="confirm-regenerate-icon">⚠️</div>
-                    <h3>Confirmar Regeneración de Video</h3>
-                    <p>Se regenerará el video con las escenas incluidas. ¿Deseas continuar?</p>
+                    <h3>Confirmar Unir Videos</h3>
+                    <p>Se unirán los videos sólo con las escenas incluidas. ¿Deseas continuar?</p>
                     <div class="confirm-regenerate-actions">
-                        <button class="btn-confirm-regenerate-yes">Sí, regenerar</button>
+                        <button class="btn-confirm-regenerate-yes">Sí, unir videos</button>
                         <button class="btn-confirm-regenerate-no">No, cancelar</button>
                     </div>
                 </div>
@@ -763,6 +861,114 @@ function openEditModal(data) {
         yesBtn.addEventListener('click', async function () {
             cerrarModal();
             await generarVideo(includedScenes);
+        });
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) cerrarModal();
+        });
+
+        document.addEventListener('keydown', function handler(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+                document.removeEventListener('keydown', handler);
+            }
+        });
+    }
+
+    // Modal de advertencia cuando hay escenas bloqueadas (3 ediciones alcanzadas).
+    // Solo se enviarán al backend las escenas que aún puedan editarse.
+    function mostrarAdvertenciaEscenasBloqueadasModal(excludedScenes, includedScenes) {
+        const existing = document.querySelector('.advertencia-escenas-bloqueadas-overlay');
+        if (existing) existing.remove();
+
+        const excludedListHTML = excludedScenes.map(scene =>
+            `<li>Escena ${scene.numero} - "${escaparHTML(scene.titulo)}" (${scene.ediciones}/3 ediciones)</li>`
+        ).join('');
+
+        const html = `
+            <div class="advertencia-escenas-bloqueadas-overlay">
+                <div class="advertencia-escenas-bloqueadas-modal">
+                    <div class="advertencia-escenas-bloqueadas-icon">⚠️</div>
+                    <h3>Escenas Bloqueadas Detectadas</h3>
+                    <p class="advertencia-text">Las siguientes escenas han alcanzado el límite de 3 ediciones y <strong>NO se enviarán</strong> al backend:</p>
+                    <ul class="excluded-scenes-list">${excludedListHTML}</ul>
+                    <p class="advertencia-info">Solo se enviarán <strong>${includedScenes.length} escenas</strong> que aún puedan editarse. ¿Deseas continuar?</p>
+                    <div class="advertencia-escenas-actions">
+                        <button class="btn-advertencia-yes">Sí, continuar</button>
+                        <button class="btn-advertencia-no">No, cancelar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', html);
+
+        const overlay = document.querySelector('.advertencia-escenas-bloqueadas-overlay');
+        const yesBtn = overlay.querySelector('.btn-advertencia-yes');
+        const noBtn = overlay.querySelector('.btn-advertencia-no');
+
+        function cerrarModal() {
+            overlay.remove();
+        }
+
+        noBtn.addEventListener('click', function () {
+            cerrarModal();
+        });
+
+        yesBtn.addEventListener('click', async function () {
+            cerrarModal();
+            mostrarConfirmacionGenerarVideoFinalModal(includedScenes);
+        });
+
+        overlay.addEventListener('click', function (e) {
+            if (e.target === overlay) cerrarModal();
+        });
+
+        document.addEventListener('keydown', function handler(e) {
+            if (e.key === 'Escape') {
+                cerrarModal();
+                document.removeEventListener('keydown', handler);
+            }
+        });
+    }
+
+    // Modal de confirmación para "Generar Video" (endpoint /webhook/generation).
+    // Mismo patrón visual que el de "Unir videos", con textos propios.
+    function mostrarConfirmacionGenerarVideoFinalModal(includedScenes) {
+        const existing = document.querySelector('.confirm-generar-video-final-overlay');
+        if (existing) existing.remove();
+
+        const html = `
+            <div class="confirm-generar-video-final-overlay">
+                <div class="confirm-generar-video-final-modal">
+                    <div class="confirm-generar-video-final-icon">⚠️</div>
+                    <h3>Confirmar Generación de Video</h3>
+                    <p>Se generará el video final con las escenas que han sido incluidas y aún puedan editarse pasando nuevamente por Veo 3.1. ¿Deseas continuar?</p>
+                    <div class="confirm-generar-video-final-actions">
+                        <button class="btn-confirm-generar-video-final-yes">Sí, generar video</button>
+                        <button class="btn-confirm-generar-video-final-no">No, cancelar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', html);
+
+        const overlay = document.querySelector('.confirm-generar-video-final-overlay');
+        const yesBtn = overlay.querySelector('.btn-confirm-generar-video-final-yes');
+        const noBtn = overlay.querySelector('.btn-confirm-generar-video-final-no');
+
+        function cerrarModal() {
+            overlay.remove();
+        }
+
+        noBtn.addEventListener('click', function () {
+            cerrarModal();
+        });
+
+        yesBtn.addEventListener('click', async function () {
+            cerrarModal();
+            await generarVideoFinal(includedScenes);
         });
 
         overlay.addEventListener('click', function (e) {
@@ -827,7 +1033,71 @@ function openEditModal(data) {
             mostrarErrorAlert(`Error de conexión: ${error.message}`);
         } finally {
             btnGenerateVideo.disabled = false;
-            btnGenerateVideo.innerHTML = 'Regenerar video';
+            btnGenerateVideo.innerHTML = 'Unir videos';
+        }
+    }
+
+    // "Generar Video": mismo payload que generarVideo(), pero apunta a
+    // /webhook/generation. n8n confirma que el proceso inició (no que terminó),
+    // así que en vez de mostrar éxito de inmediato, se muestra un modal
+    // bloqueante con ese mensaje y se hace polling a /webhook/estado hasta
+    // que estado === 'generado' (mismo patrón que la regeneración de escenas).
+    async function generarVideoFinal(includedScenes) {
+        const btnGenerarVideoFinalEl = document.getElementById('btnGenerarVideoFinal');
+
+        const payload = {
+            produccion_id: document.querySelector('.edit-modal')?.dataset?.produccionId || '',
+            noticia_id: document.querySelector('.edit-modal')?.dataset?.noticiaId || '',
+            email_editor: document.getElementById('email')?.value?.trim() || '',
+            titulo_video: document.getElementById('titulo_video')?.value?.trim() || '',
+            descripcion_video: document.getElementById('descripcion_video')?.value?.trim() || '',
+            editor_responsable: document.getElementById('editor_responsable')?.value?.trim() || '',
+            formato: document.getElementById('formato')?.value?.trim() || 'historieta',
+            main_scene: document.getElementById('main_scene')?.value?.trim() || '',
+            imagen_seleccionada: document.getElementById('imagen_seleccionada_url')?.value?.trim() || '',
+            escenas: includedScenes,
+            submittedAt: new Date().toISOString(),
+            formMode: 'generate',
+        };
+
+        btnGenerarVideoFinalEl.disabled = true;
+        btnGenerarVideoFinalEl.innerHTML = '<span class="spinner"></span>Generando...';
+
+        try {
+            const response = await fetch(`${DOMAIN}/webhook/generation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                let errorMessage = `Error ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message ?? errorData.mensaje ?? errorMessage;
+                } catch {
+                    // Si no es JSON, usar el mensaje de status
+                }
+                mostrarErrorAlert(`Error al generar video: ${errorMessage}`);
+                btnGenerarVideoFinalEl.disabled = false;
+                btnGenerarVideoFinalEl.innerHTML = 'Generar Video';
+                return;
+            }
+
+            const result = await response.json();
+
+            // El POST fue aceptado: n8n confirma que el proceso de generación
+            // inició (no que terminó). Mostrar modal bloqueante con ese mensaje
+            // y arrancar el polling a /webhook/estado.
+            mostrarGenerandoVideoFinalModal(result.message ?? result.mensaje ?? 'Generación de video en proceso');
+
+            const noticiaIdActual = document.querySelector('.edit-modal')?.dataset?.noticiaId || '';
+            await pollVideoGenerado(noticiaIdActual, btnGenerarVideoFinalEl);
+
+        } catch (error) {
+            mostrarErrorAlert(`Error de conexión: ${error.message}`);
+            btnGenerarVideoFinalEl.disabled = false;
+            btnGenerarVideoFinalEl.innerHTML = 'Generar Video';
         }
     }
     
@@ -881,8 +1151,20 @@ function pollEscenaRegenerada(itemId, btn) {
         'Error en la generación del video debido al servicio que fusiona escenas'
     ];
 
+    // checking: evita que se solapen dos fetch si uno tarda más de 5s (el tick
+    // del setInterval no espera a que termine el anterior).
+    // resuelto: evita procesar el resultado más de una vez si, aun con el guard
+    // anterior, dos ticks llegan a detectar éxito casi al mismo tiempo.
+    // Sin estas dos banderas, una respuesta lenta podía disparar el modal de
+    // "Escena Regenerada" dos veces.
+    let checking = false;
+    let resuelto = false;
+
     return new Promise((resolve) => {
         const intervalId = setInterval(async () => {
+            if (checking || resuelto) return;
+            checking = true;
+
             try {
                 const response = await fetch(`https://events.elcomercio.pe/webhook/escena?item_id=${encodeURIComponent(itemId)}`);
                 if (!response.ok) {
@@ -898,6 +1180,8 @@ function pollEscenaRegenerada(itemId, btn) {
                     return;
                 }
 
+                if (resuelto) return; // por si otro tick ya procesó el resultado
+                resuelto = true;
                 clearInterval(intervalId);
 
                 // Cerrar el modal bloqueante "Generación de Escena en Proceso"
@@ -929,12 +1213,107 @@ function pollEscenaRegenerada(itemId, btn) {
             } catch (error) {
                 console.warn('⚠️ Error en polling de /webhook/escena:', error.message);
                 // seguimos intentando en el siguiente tick
+            } finally {
+                checking = false;
             }
         }, 5000);
     });
 }
 
-function mostrarVideoSuccessModal(message) {
+// Hace polling GET a /webhook/estado?jobId=... (usando noticia_id como
+// identificador, igual que el resto del flujo) hasta detectar estado ===
+// 'generado'. Mismo patrón anti-solape (checking/resuelto) que
+// pollEscenaRegenerada, para evitar mostrar el modal de éxito dos veces si
+// una respuesta tarda más de 5s. Si el backend reporta un estado de error,
+// se corta el polling y se muestra el mensaje de error correspondiente.
+function pollVideoGenerado(jobId, btn) {
+    let checking = false;
+    let resuelto = false;
+
+    return new Promise((resolve) => {
+        const intervalId = setInterval(async () => {
+            if (checking || resuelto) return;
+            checking = true;
+
+            try {
+                const response = await fetch(`${DOMAIN}/webhook/estado?jobId=${encodeURIComponent(jobId)}`);
+                if (!response.ok) {
+                    console.warn('⚠️ /webhook/estado respondió con error, se reintenta en el próximo tick');
+                    return;
+                }
+
+                const rawData = await response.json();
+                const statusData = Array.isArray(rawData) ? (rawData.length > 0 ? rawData[0] : null) : rawData;
+
+                if (!statusData) {
+                    // Todavía no hay datos, seguimos esperando
+                    return;
+                }
+
+                // Si error_message viene con contenido, cortamos el polling de inmediato
+                // sin importar qué diga "estado" (puede no ser 'error'/'failed' todavía).
+                if (statusData.error_message !== null && statusData.error_message !== undefined && statusData.error_message !== '') {
+                    if (resuelto) return;
+                    resuelto = true;
+                    clearInterval(intervalId);
+
+                    document.querySelector('.generando-video-final-overlay')?.remove();
+                    mostrarErrorAlert(statusData.error_message);
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'Generar Video';
+                    }
+                    resolve();
+                    return;
+                }
+
+                if (statusData.estado === 'generado') {
+                    if (resuelto) return;
+                    resuelto = true;
+                    clearInterval(intervalId);
+
+                    document.querySelector('.generando-video-final-overlay')?.remove();
+
+                    const btnVerVideo = document.querySelector('.btn-ver-video');
+                    if (btnVerVideo && statusData.video_url) {
+                        btnVerVideo.setAttribute('data-video-url', statusData.video_url);
+                    }
+
+                    await mostrarVideoSuccessModal(statusData.message ?? statusData.mensaje ?? 'Video generado con éxito');
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'Generar Video';
+                    }
+                    resolve();
+                } else if (statusData.estado === 'error' || statusData.estado === 'failed') {
+                    if (resuelto) return;
+                    resuelto = true;
+                    clearInterval(intervalId);
+
+                    document.querySelector('.generando-video-final-overlay')?.remove();
+                    mostrarErrorAlert(statusData.message ?? statusData.mensaje ?? 'Ocurrió un error al generar el video.');
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = 'Generar Video';
+                    }
+                    resolve();
+                }
+                // Cualquier otro estado: seguimos esperando al próximo tick
+            } catch (error) {
+                console.warn('⚠️ Error en polling de /webhook/estado (video final):', error.message);
+                // seguimos intentando en el siguiente tick
+            } finally {
+                checking = false;
+            }
+        }, 5000);
+    });
+}
+
+
+async function mostrarVideoSuccessModal(message) {
     const existing = document.querySelector('.video-success-overlay');
     if (existing) existing.remove();
     
@@ -942,7 +1321,7 @@ function mostrarVideoSuccessModal(message) {
         <div class="video-success-overlay">
             <div class="video-success-modal">
                 <div class="video-success-icon">✅</div>
-                <h3>Video Regenerado</h3>
+                <h3>Video Generado</h3>
                 <p>${escaparHTML(message)}</p>
                 <button class="btn-video-success-close">Cerrar</button>
             </div>
@@ -954,8 +1333,25 @@ function mostrarVideoSuccessModal(message) {
     const overlay = document.querySelector('.video-success-overlay');
     const closeBtn = overlay.querySelector('.btn-video-success-close');
     
-    function cerrarModal() {
+    async function cerrarModal() {
         overlay.remove();
+
+        // Mismo patrón que mostrarRegenerarSuccessModal: refrescar las escenas
+        // sin recargar todo el editor, usando el produccion_id del modal actual.
+        const produccionId = document.querySelector('.edit-modal')?.dataset?.produccionId;
+        if (produccionId) {
+            try {
+                const response = await fetch(`${DOMAIN}/webhook/get-edit?production_id=${encodeURIComponent(produccionId)}`);
+                if (response.ok) {
+                    const scenesData = await response.json();
+                    if (Array.isArray(scenesData) && scenesData.length > 0) {
+                        actualizarEscenasUI(scenesData);
+                    }
+                }
+            } catch (fetchError) {
+                console.warn('Error al llamar get-edit:', fetchError.message);
+            }
+        }
     }
     
     closeBtn.addEventListener('click', cerrarModal);
@@ -1071,9 +1467,12 @@ function actualizarEscenasUI(scenesData) {
         const dialogueTexto = esc.dialogue ?? esc.dialogo ?? '';
 
         if (Number(ediciones) >= maxEdits) {
+            // Marcar la tarjeta como locked (mismo estado que el render inicial)
+            sceneCard.classList.add('locked');
+
+            // Quitar el botón de regenerar en vez de solo deshabilitarlo
             if (btnRegenerate) {
-                btnRegenerate.setAttribute('data-ediciones', ediciones);
-                btnRegenerate.disabled = true;
+                btnRegenerate.remove();
             }
 
             // Si la escena todavía tiene el textarea editable, reemplazarlo por el
@@ -1092,7 +1491,8 @@ function actualizarEscenasUI(scenesData) {
                 const lockedText = sceneCard.querySelector('.locked-dialogue-text');
                 if (lockedText) lockedText.textContent = dialogueTexto;
             }
-        } else {
+}
+         else {
             if (btnRegenerate) {
                 btnRegenerate.setAttribute('data-ediciones', ediciones);
                 btnRegenerate.disabled = false;
