@@ -240,7 +240,7 @@ async function iniciarProceso(email, noteUrl, formatoSeleccionado = null) {
                 localStorage.setItem('videoJobUrl', noteUrl);
                 localStorage.setItem('videoEmail', email);
             }
-            mostrarGenerandoVideoModal(generatingData.message || 'El video se está generando.');
+            mostrarGenerandoVideoModal(generatingData.message || 'Generación de second brain en proceso.');
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳ Video generándose...';
             if (jobId) {

@@ -368,19 +368,35 @@ function buildEditForm(data) {
     }
 
     // --- 3. Selector de imagen ---
-    if (imagenes && imagenes.length > 0 && es_video) {
-        const defaultImgUrl = imagenes[0]?.url || '';
+    if (imagenes && imagenes.length > 0) {
+        const isHistorieta = (formato || 'historieta') === 'historieta';
+
+        let selectedIndex = isHistorieta ? 'none' : 0;
+        if (!isHistorieta && imagen_seleccionada_default) {
+            const foundIdx = imagenes.findIndex(img => img.url === imagen_seleccionada_default);
+            if (foundIdx !== -1) selectedIndex = foundIdx;
+        }
+
+        const defaultImgName = selectedIndex === 'none' ? 'Sin imagen' : `Imagen ${selectedIndex + 1}`;
+        const defaultImgUrl = selectedIndex === 'none' ? '' : (imagenes[selectedIndex]?.url || '');
+
         formHTML += `
             <div class="image-selector-card">
                 <h3>🖼️ Seleccionar Imagen de la Nota</h3>
                 <div class="image-grid">
+                    <div onclick="selectThumbnail('none')" id="thumb-none" class="image-thumb no-image-thumb${selectedIndex === 'none' ? ' selected' : ''}">
+                        <div class="no-image-content">
+                            <span class="no-image-icon">🚫</span>
+                            <span class="no-image-text">Sin imagen</span>
+                        </div>
+                    </div>
                     ${imagenes.map((img, index) => `
-                        <div onclick="selectThumbnail(${index})" id="thumb-${index}" class="image-thumb${index === 0 ? ' selected' : ''}">
+                        <div onclick="selectThumbnail(${index})" id="thumb-${index}" class="image-thumb${selectedIndex === index ? ' selected' : ''}">
                             <img src="${escaparHTML(img.url)}">
                         </div>
                     `).join("")}
                 </div>
-                <input type="hidden" id="imagen_seleccionada" value="Imagen 1">
+                <input type="hidden" id="imagen_seleccionada" value="${escaparHTML(defaultImgName)}">
                 <input type="hidden" id="imagen_seleccionada_url" value="${escaparHTML(defaultImgUrl)}">
             </div>`;
     }
@@ -480,7 +496,6 @@ function buildEditForm(data) {
                 </div>
                 <div class="edit-modal-footer">
                     <div class="footer-actions">
-                        <button class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
                         <button class="btn-save" id="btnSave">Guardar cambios</button>
                         <button class="btn-generate-video" id="btnGenerateVideo">Unir videos</button>
                         <button class="btn-generate-video-final" id="btnGenerarVideoFinal">Generar Video</button>
@@ -501,9 +516,20 @@ window.selectThumbnail = function(index) {
         selected.style.borderColor = '#E30613';
         selected.classList.add('selected');
         const img = selected.querySelector('img');
-        document.getElementById('imagen_seleccionada').value = `Imagen ${index + 1}`;
-        if (img && document.getElementById('imagen_seleccionada_url')) {
-            document.getElementById('imagen_seleccionada_url').value = img.src;
+        if (index === 'none' || index === -1 || !img) {
+            if (document.getElementById('imagen_seleccionada')) {
+                document.getElementById('imagen_seleccionada').value = 'Sin imagen';
+            }
+            if (document.getElementById('imagen_seleccionada_url')) {
+                document.getElementById('imagen_seleccionada_url').value = '';
+            }
+        } else {
+            if (document.getElementById('imagen_seleccionada')) {
+                document.getElementById('imagen_seleccionada').value = `Imagen ${typeof index === 'number' ? index + 1 : index}`;
+            }
+            if (img && document.getElementById('imagen_seleccionada_url')) {
+                document.getElementById('imagen_seleccionada_url').value = img.src;
+            }
         }
     }
 };
@@ -1087,10 +1113,7 @@ function openEditModal(data) {
             const result = await response.json();
 
             // El POST fue aceptado: n8n confirma que el proceso de generación
-            // inició (no que terminó). Mostrar modal bloqueante con ese mensaje
-            // y arrancar el polling a /webhook/estado.
-            mostrarGenerandoVideoFinalModal(result.message ?? result.mensaje ?? 'Generación de video en proceso');
-
+            // inició (no que terminó). Arrancar el polling a /webhook/estado.
             const noticiaIdActual = document.querySelector('.edit-modal')?.dataset?.noticiaId || '';
             await pollVideoGenerado(noticiaIdActual, btnGenerarVideoFinalEl);
 

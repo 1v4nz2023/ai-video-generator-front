@@ -59,6 +59,34 @@
     object-fit: cover;
 }
 
+.no-image-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-gray-100);
+    box-sizing: border-box;
+}
+
+.no-image-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    color: var(--color-text-medium);
+    user-select: none;
+}
+
+.no-image-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.no-image-text {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
 /* ===== Config Section ===== */
 .config-section {
     background: var(--color-card);
