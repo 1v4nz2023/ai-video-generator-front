@@ -32,7 +32,7 @@
     background: var(--color-card);
     border-radius: var(--radius-2xl);
     width: 100%;
-    max-width: 800px;
+    max-width: 1200px;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
@@ -916,7 +916,7 @@
     background: var(--color-card);
     border-radius: var(--radius-2xl);
     width: 100%;
-    max-width: 600px;
+    max-width: 1200px;
     max-height: 80vh;
     overflow-y: auto;
     padding: var(--spacing-4xl) var(--spacing-3xl);

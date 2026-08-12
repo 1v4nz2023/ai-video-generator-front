@@ -219,22 +219,33 @@ async function iniciarProceso(email, noteUrl, formatoSeleccionado = null) {
 
         const data = await initResponse.json();
 
-        // Detectar respuesta de "video se está generando" (objeto plano o array con objeto)
+        // Helper para comprobar si el mensaje representa un proceso en curso
+        const isGeneratingMessage = (msg) => {
+            if (!msg || typeof msg !== 'string') return false;
+            const lower = msg.toLowerCase();
+            return lower.includes('video se está generando') ||
+                   lower.includes('generación de second brain en proceso') ||
+                   lower.includes('en proceso') ||
+                   lower.includes('generando') ||
+                   lower.includes('procesando');
+        };
+
+        // Detectar respuesta de proceso en curso (objeto plano o array con objeto)
         let generatingData = null;
-        if (data && typeof data === 'object' && !Array.isArray(data) && data.message && data.message.includes('video se está generando')) {
+        if (data && typeof data === 'object' && !Array.isArray(data) && data.message && isGeneratingMessage(data.message)) {
             generatingData = data;
         } else if (data && data.length > 0) {
             let responseData = data[0];
             if (Array.isArray(responseData)) {
                 responseData = responseData[0];
             }
-            if (responseData && typeof responseData === 'object' && responseData.message && responseData.message.includes('video se está generando')) {
+            if (responseData && typeof responseData === 'object' && responseData.message && isGeneratingMessage(responseData.message)) {
                 generatingData = responseData;
             }
         }
 
         if (generatingData) {
-            const jobId = generatingData.jobId || generatingData.job_id;
+            const jobId = generatingData.jobId || generatingData.job_id || generatingData.noticia_id;
             if (jobId) {
                 localStorage.setItem('videoJobId', jobId);
                 localStorage.setItem('videoJobUrl', noteUrl);
